@@ -1,92 +1,169 @@
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QLabel,QPushButton, QFileDialog,QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QTabWidget,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSpacerItem,
+    QSizePolicy,
+    QTextEdit,
+    QScrollArea,
+)
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
-from file_system import FileHandler
+import sys
+from general_tab import add_general_features
 
 
-def Left_section():
-    left_section = QWidget()
-    #left_section.setStyleSheet("border: 2px solid black; background-color: lightgray;")
-    
-    # Create a vertical layout for the left section
-    left_layout = QVBoxLayout()
-    left_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+class SettingsWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Settings")
+        self.setMinimumSize(1500, 1000)
 
-    # Add a logo at the top
-    logo_label = QLabel()
-    logo_path = r"E:\Frankfurt University of Applied Sciences\Master Thesis\Code\Example\Logo\image(1).png"
-    logo_pixmap = QPixmap(logo_path)
-    logo_label.setPixmap(logo_pixmap)
-    logo_label.setScaledContents(True)
-    logo_label.setFixedSize(300, 120)
-    logo_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        # Create a central widget and a vertical layout
+        central_widget = QWidget()
+        central_layout = QVBoxLayout()
 
-    # Add spacer to create space between the logo and the button
-    spacer = QSpacerItem(100, 50, QSizePolicy.Minimum, QSizePolicy.Fixed) 
+        # Add a logo at the top
+        logo_label = QLabel()
+        logo_path = r"C:\@DevDocs\Projects\Mine\New folder\Ultrasonic-Sensor-ML\UltrasonicSensorApp\Logo\image(1).png"
+        logo_pixmap = QPixmap(logo_path)
+        if not logo_pixmap.isNull():
+            print("Logo loaded successfully.")
+        else:
+            print("Failed to load logo. Check file path or format.")
+        logo_label.setPixmap(logo_pixmap)
+        logo_label.setScaledContents(True)
+        logo_label.setFixedSize(300, 120)  # Adjust size as needed
+        logo_label.setStyleSheet("margin: 10px;")
+        logo_label.setAlignment(Qt.AlignCenter)
 
-    # Add a "Select File" button
-    select_file_button = QPushButton("Select File")
-    select_file_button.setStyleSheet("background-color: white; border: 1px solid black; padding: 5px;")
-    select_file_button.setFixedWidth(150)
+        # Create a tab widget
+        tab_widget = QTabWidget()
+        tab_widget.setStyleSheet("QTabBar::tab { padding: 10px; }")
 
-    # Add a label to display the selected file path
-    file_path_label = QLabel("No file selected")
-    file_path_label.setStyleSheet("background-color: white; border: 1px solid black; padding: 10px; color: black; font-size: 12px;")
-    file_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)  # Allow it to expand horizontally
-    file_path_label.setWordWrap(True)  # Allow multiline for long paths
-     
-    # Create an instance of FileHandler
-    file_handler = FileHandler()
+        # Create a text output dialog box for logs
+        self.output_box = QTextEdit()
+        self.output_box.setReadOnly(True)  # Make it read-only
+        self.output_box.setStyleSheet(
+            "background-color: white; border: 1px solid gray; font-size: 18px; padding: 5px;"
+        )
+        self.output_box.setFixedHeight(250)  # Adjust height as needed
+        self.output_box.append("Logs will appear here.")  # Initial message
 
-    # Connect the button click to the select_file method
-    select_file_button.clicked.connect(lambda: update_file_path(file_handler, file_path_label))
+        # Add tabs to the tab widget
+        tab_widget.addTab(self.general_tab(), "General")
+        tab_widget.addTab(self.advanced_tab(), "Advanced")
+        tab_widget.addTab(self.about_tab(), "About")
 
-    # Add the logo to the layout
-    left_layout.addWidget(logo_label)
-    left_layout.addSpacerItem(spacer)  # Add space below the logo
-    left_layout.addWidget(select_file_button)
-    left_layout.addWidget(file_path_label)
+        # Add OK, Cancel, and Exit buttons at the bottom
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(10, 10, 10, 10)
+        button_layout.setSpacing(20)
 
-    # Set the layout to the left section
-    left_section.setLayout(left_layout)
+        ok_button = QPushButton("OK")
+        cancel_button = QPushButton("Cancel")
+        exit_button = QPushButton("Exit")
 
-    return left_section
+        # Set styles and size for buttons
+        for button in [ok_button, cancel_button, exit_button]:
+            button.setFixedSize(100, 40)
+
+        # Add functionality to buttons
+        ok_button.clicked.connect(self.ok_action)
+        cancel_button.clicked.connect(self.cancel_action)
+        exit_button.clicked.connect(self.close)
+
+        # Add buttons to the layout with spacers
+        button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(exit_button)
+
+        # Add the logo, tab widget, output box, and buttons to the central layout
+        central_layout.addWidget(logo_label)
+        central_layout.addWidget(tab_widget)
+        central_layout.addWidget(self.output_box)
+        central_layout.addLayout(button_layout)
+
+        # Set the layout to the central widget
+        central_widget.setLayout(central_layout)
+        self.setCentralWidget(central_widget)
+
+    def ok_action(self):
+        """Handle OK button click."""
+        self.output_box.append("OK button clicked.")
+        print("OK button clicked.")
+
+    def cancel_action(self):
+        """Handle Cancel button click."""
+        self.output_box.append("Cancel button clicked.")
+        print("Cancel button clicked.")
+
+    def general_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("General Settings")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        layout.addWidget(label)
+       
+        # Call the function from features.py to add more features
+        add_general_features(layout,self.output_box)  # This will add the additional features to the layout  
+
+        layout.addStretch()  # Push contents to the top
+
+        tab.setLayout(layout)
+        return tab
+
+    def advanced_tab(self):
+        """Create the Advanced tab."""
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("Advanced Settings")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        example_button = QPushButton("Configure Environment Variables")
+        example_button.setStyleSheet(
+            "background-color: lightgray; padding: 10px; font-size: 14px;"
+        )
+
+        layout.addWidget(label)
+        layout.addWidget(example_button)
+        layout.addStretch()  # Push contents to the top
+        tab.setLayout(layout)
+        return tab
+
+    def about_tab(self):
+        """Create the About tab."""
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("About This Application")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        description = QLabel(
+            "This is a sample settings application created using PyQt5.\n\nVersion: 1.0"
+        )
+        description.setStyleSheet("font-size: 14px;")
+        description.setWordWrap(True)
+
+        layout.addWidget(label)
+        layout.addWidget(description)
+        layout.addStretch()  # Push contents to the top
+        tab.setLayout(layout)
+        return tab
 
 
-def Right_section():
-    """Creates and returns the right section with fixed style."""
-    right_section = QWidget()
-    right_section.setStyleSheet("border: 2px solid black; background-color: lightblue;")
-    
-    return right_section
-
-def setup_gui(main_window):
-    main_window.setWindowTitle("Ultrasonic Sensor App")
-    main_window.setMinimumSize(1200, 800)
-    main_window.setGeometry(100, 100, 1000, 200)  # Set initial window size
-
-    # Main horizontal layout to hold left and right sections
-    main_layout = QHBoxLayout()
-
-    # Create left and right sections
-    left_section = Left_section()
-    right_section = Right_section()
-
-    # Add sections to the main layout
-    main_layout.addWidget(left_section, 30)  # 40% of the space
-    main_layout.addWidget(right_section, 70)  # 60% of the space
-
-    # Set the layout to the main window
-    container = QWidget()
-    container.setLayout(main_layout)
-    main_window.setCentralWidget(container)
-
-    return main_window
-
-def update_file_path(file_handler, file_path_label):
-    """Handle the file selection and update the file path label."""
-    selected_file = file_handler.select_file()
-    if selected_file:
-        file_path_label.setText(selected_file)
-    else:
-        file_path_label.setText("No file selected")
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = SettingsWindow()
+    window.show()
+    sys.exit(app.exec_())
