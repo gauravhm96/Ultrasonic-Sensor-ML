@@ -1,6 +1,7 @@
-from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QFileDialog,QSizePolicy,QHBoxLayout
+from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QFileDialog,QSizePolicy,QHBoxLayout,QDialog,QProgressBar,QApplication
 from PyQt5.QtCore import Qt
 from SignalProcess import SignalProcessor
+import time
 
 def add_general_features(layout,output_box):
    
@@ -62,7 +63,41 @@ def add_general_features(layout,output_box):
     
     # Define a function to calculate distance
     def calculate_distance():
-        # Ensure `signalprocess` is initialized and ready
+        dialog = QDialog()
+        dialog.setWindowTitle("Processing")
+        dialog.setFixedSize(500, 150)
+        
+        layout = QVBoxLayout()
+        progress_label = QLabel("Calculating distance")
+        progress_label.setStyleSheet("font-size: 16px; padding: 5px;")
+        progress_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(progress_label)
+        
+        progress_bar = QProgressBar()
+        progress_bar.setStyleSheet("""QProgressBar {font-size: 16px;padding: 5px;text-align: center;}
+                                      QProgressBar::chunk {background-color: #4caf50;width: 1px;}""")
+        progress_bar.setRange(0, 100)
+        layout.addWidget(progress_bar)
+        
+        # Ok button
+        ok_button = QPushButton("Ok")
+        ok_button.setEnabled(False)  # Initially disabled
+        ok_button.setFixedSize(80, 30)
+        ok_button.setStyleSheet("font-size: 14px; padding: 5px;")
+        ok_button.clicked.connect(dialog.close)
+        layout.addWidget(ok_button,alignment=Qt.AlignCenter)
+        
+        layout.setAlignment(Qt.AlignCenter)
+        dialog.setLayout(layout)
+        dialog.show()
+        
+        # Simulate a long process by updating the progress bar in increments
+        for i in range(101):  # Increment from 0 to 100
+            progress_bar.setValue(i)
+            time.sleep(0.03)  # Simulate a time-consuming task
+            QApplication.processEvents()  # Update the UI during the loop
+
+
         if signalprocess:
             try:
                 # Process the signal
@@ -80,10 +115,16 @@ def add_general_features(layout,output_box):
                 # Update the label with the calculated distance
                 calculate_distance_label.setText(f"{distance:.2f} m")
                 output_box.append("Distance calculation completed successfully.")
+                progress_label.setText(f"Calculation completed! Distance: {distance:.2f} m")
             except Exception as e:
                 output_box.append(f"Error during distance calculation: {e}")
+                progress_label.setText("Signal processor not initialized.")
         else:
             output_box.append("Signal processor not initialized.")
+        
+        ok_button.setEnabled(True)
+        dialog.exec()
+        
         
     calculate_distance_button.clicked.connect(calculate_distance)
 
