@@ -58,8 +58,33 @@ def add_general_features(layout,output_box):
     distance_label.addWidget(calculate_distance_label)
 
     distance_label.addStretch()
-    layout.addLayout(distance_label)     
+    layout.addLayout(distance_label)
     
+    # Define a function to calculate distance
+    def calculate_distance():
+        # Ensure `signalprocess` is initialized and ready
+        if signalprocess:
+            try:
+                # Process the signal
+                signalprocess.analyze_raw_signals()
+                signalprocess.annotate_real_peaks()
+                signalprocess.NoiseFiltering()
+                signalprocess.SignalCorrection()
+
+                # Calculate the distance
+                distance_info = signalprocess.Calculate_Distance()
+                
+                 # Extract the distance value from the returned dictionary
+                distance = distance_info.get("distance", 0.0)
+
+                # Update the label with the calculated distance
+                calculate_distance_label.setText(f"{distance:.2f} m")
+                output_box.append("Distance calculation completed successfully.")
+            except Exception as e:
+                output_box.append(f"Error during distance calculation: {e}")
+        else:
+            output_box.append("Signal processor not initialized.")
+        
     calculate_distance_button.clicked.connect(calculate_distance)
 
     # Adding the "Show Computation" button

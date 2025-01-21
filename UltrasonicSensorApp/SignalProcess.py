@@ -400,7 +400,30 @@ class SignalProcessor:
             print("Render Signal Corrections Plots Skipped.")
         else:
             print("Invalid input. Please enter 'yes' or 'no'.")
-    
+            
+        user_input = input("Do you want to view Calculated Data? (yes/no): ").strip().lower()
+        
+        if user_input == 'yes':
+            try:
+                if self.distance_info:
+                    if self.distance_info.get("TOF") is not None:
+                        print("=== Distance Calculation Results ===")
+                        print("ADC Sample Frequency: {:.2f} Hz".format(self.distance_info["ADC_SAMPLE_FREQUENCY"]))
+                        print("Time Interval:", self.distance_info["time_interval"], "seconds")
+                        print("Time of Flight (TOF):", self.distance_info["TOF"], "seconds")
+                        print("Distance: {:.2f} meters".format(self.distance_info["distance"]))
+                        print("Calculations done successfully.")
+                    else:
+                        print("Error in Distance Calculation: max_peak_index not found!")
+            except Exception as e:
+                print(f"An error occurred while calculating data: {e}")
+                self.state = "error"
+        elif user_input == 'no':
+            print("View Calculated Data Skipped.")
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
+            
+                
     def Calculate_Distance(self):
         # Constants
         ADC_MAX_SAMPLE_FREQUENCY = 125000000  # Hz
@@ -434,10 +457,10 @@ class SignalProcessor:
         }
 
         # Print the calculated results
-        print("ADC Sample Frequency: {:.2f} Hz".format(ADC_SAMPLE_FREQUENCY))
-        print("Time Interval:", time_interval, "seconds")
-        print("Time of Flight (TOF):", TOF, "seconds")
-        print("Distance: {:.2f} meters".format(distance))
+        #print("ADC Sample Frequency: {:.2f} Hz".format(ADC_SAMPLE_FREQUENCY))
+        #print("Time Interval:", time_interval, "seconds")
+        #print("Time of Flight (TOF):", TOF, "seconds")
+        #print("Distance: {:.2f} meters".format(distance))
 
         return self.distance_info
 
@@ -463,13 +486,5 @@ class SignalProcessor:
 
 
 #if __name__ == "__main__":
-    #file_path = "C:/@DevDocs/Projects\Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_56.txt"
-    #processor = SignalProcessor(file_path)
-    #processor.load_signal_data()
-    #processor.analyze_raw_signals()
-    #processor.annotate_real_peaks()
-    #processor.NoiseFiltering()
-    #processor.SignalCorrection()
-    #processor.Calculate_Distance()
     #processor.Render_Output()
     #processor.reset()
