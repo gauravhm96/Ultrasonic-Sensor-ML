@@ -1,49 +1,89 @@
-def general_tab(self):
-    """Create the General tab."""
-    tab = QWidget()
-    layout = QVBoxLayout()
+def Render_Output(self):
+                   
+        user_input = input("Do you want to see data? (yes/no): ").strip().lower()
+        
+        if user_input == 'yes':
+            try:
+                print(self.signal_data.head())
+                self.state = "data_displayed"
+                self.state = "data_displayed"
+            except Exception as e:
+                print(f"An error occurred while displaying the signal data: {e}")
+                self.state = "error"
+        elif user_input == 'no':
+            print("Render output skipped.")
+        else:   
+            print("Invalid input. Please enter 'yes' or 'no'.")
+            
+        user_input = input("Do you want to view the signal plots? (yes/no): ").strip().lower()
+        
+        if user_input == 'yes':
+            try:
+                # Create subplots
+                fig, axs = plt.subplots(1, 2, figsize=(14, 6))
+                
+                # Plot all the signals
+                df = pd.DataFrame(self.signal_data)  # Ensure the signal data is in a DataFrame
+                
+                for i in range(df.shape[0]):
+                    signal = df.iloc[i].iloc[16:]  # Ignoring the first 16 columns
+                    axs[0].plot(signal.values[:])
+                
+                # Adding labels and title to the first subplot
+                axs[0].grid(True)
+                axs[0].set_xlabel('Time (samples)')
+                axs[0].set_ylabel('Amplitude')
+                axs[0].set_title('Signal Data')
 
-    label = QLabel("General Settings")
-    label.setStyleSheet("font-size: 18px; font-weight: bold;")
-    layout.addWidget(label)
+                # Plot original signals
+                for key, signal, _ in self.signal_dictionary:
+                    axs[0].plot(signal.values[:])
 
-    # Create a scrollable area for the features
-    scroll_area = QScrollArea()  # Create the scrollable area
-    scroll_area.setWidgetResizable(True)  # Allow content to resize
+                # Add labels and title for original signals
+                axs[0].grid(True)
+                axs[0].set_xlabel('Time (samples)')
+                axs[0].set_ylabel('Amplitude')
+                axs[0].set_title('Signal Data')
 
-    # Create a container widget for the features to be added inside the scroll area
-    feature_container = QWidget()
-    feature_layout = QVBoxLayout()
+                # Plot all the signals with absolute values
+                for i in range(df.shape[0]):
+                    signal = df.iloc[i].iloc[16:]  # Ignoring the first 16 columns
+                    absolute_signal = signal.abs()  # Taking the absolute values
 
-    # Call the function from features.py to add more features to the layout
-    add_general_features(feature_layout, self.output_box)  # This will add the additional features to the layout
+                    # Calculate mean and standard deviation of the absolute signal
+                    mean_signal = np.mean(absolute_signal)
+                    std_signal = np.std(absolute_signal)
 
-    feature_container.setLayout(feature_layout)  # Set the layout of the container widget
-    scroll_area.setWidget(feature_container)  # Set the feature container inside the scroll area
+                    # Set prominence threshold dynamically based on mean and standard deviation
+                    prominence_threshold = mean_signal + 3 * std_signal  
 
-    layout.addWidget(scroll_area)  # Add scroll area to the main layout
+                    peaks, _ = find_peaks(absolute_signal.values[:], prominence=prominence_threshold)
 
-    # Ensure the dialog box (output_box) does not stretch too much
-    self.output_box.setFixedHeight(250)  # Make sure output_box height stays constant
+                    key = f'S{i+1}'
+                    self.signal_dictionary.append((key, absolute_signal, peaks))
 
-    # Adjusting button layout (if needed)
-    button_layout = QHBoxLayout()
-    button_layout.setContentsMargins(10, 10, 10, 10)
-    button_layout.setSpacing(20)
+                    axs[1].plot(absolute_signal.values[:])
+                    axs[1].plot(peaks, absolute_signal.values[:][peaks], 'x', color='green')  # Plotting the peaks for visualization
 
-    # Make buttons adjust more appropriately
-    ok_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-    cancel_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-    exit_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+                # Adding labels and title to the second subplot
+                axs[1].grid(True)
+                axs[1].set_xlabel('Time (samples)')
+                axs[1].set_ylabel('Absolute Amplitude')
+                axs[1].set_title('Absolute Value of Signals With Peaks')
 
-    # Add buttons to the layout
-    button_layout.addWidget(ok_button)
-    button_layout.addWidget(cancel_button)
-    button_layout.addWidget(exit_button)
+                # Add a main title
+                fig.suptitle('Raw Data Captured from Ultrasonic Sensor', fontsize=16)
 
-    layout.addLayout(button_layout)  # Add the button layout to the main layout
+                # Adjust layout
+                plt.tight_layout()
+                plt.show()  
 
-    layout.addStretch()  # Push contents to the top if needed
-    tab.setLayout(layout)  # Set the layout to the tab widget
-
-    return tab
+                self.state = "output_rendered"
+                print("Plots rendered successfully.")
+            except Exception as e:
+                print(f"An error occurred while rendering the plots: {e}")
+                self.state = "error"
+        elif user_input == 'no':
+            print("Render output skipped.")
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")

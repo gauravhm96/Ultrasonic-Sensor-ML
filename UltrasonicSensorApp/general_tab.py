@@ -1,9 +1,11 @@
 from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QFileDialog,QSizePolicy,QHBoxLayout
 from PyQt5.QtCore import Qt
+from SignalProcess import SignalProcessor
 
 def add_general_features(layout,output_box):
-    """Adds features to the general tab layout."""
-    # Example: Adding a new label
+   
+    signalprocess = SignalProcessor()
+
     feature_label = QLabel("This is a feature label for the general tab.")
     feature_label.setStyleSheet("font-size: 18px; font-weight: normal;padding: 5px")
     layout.addWidget(feature_label)
@@ -32,6 +34,8 @@ def add_general_features(layout,output_box):
             file_path_label.setText(file_path)
             # Print path in the output box
             output_box.append(f"File selected: {file_path}")
+            signalprocess.set_file_path(file_path)
+            signalprocess.load_signal_data()
 
     # Connect the button to the select file function
     select_file_button.clicked.connect(select_file)
@@ -54,11 +58,7 @@ def add_general_features(layout,output_box):
     distance_label.addWidget(calculate_distance_label)
 
     distance_label.addStretch()
-    layout.addLayout(distance_label)
-
-    def calculate_distance():
-        # Placeholder: Add the logic for distance calculation
-        output_box.append("Distance calculation logic will be implemented here.")
+    layout.addLayout(distance_label)     
     
     calculate_distance_button.clicked.connect(calculate_distance)
 
@@ -69,7 +69,7 @@ def add_general_features(layout,output_box):
     layout.addWidget(show_computation_button)
 
     def show_computation():
-        # Placeholder: Add the logic to show computation results
-        output_box.append("Computation results will be displayed here.")
+       # Placeholder: Add the logic to show computation results
+       output_box.append("Computation results will be displayed here.")
 
     show_computation_button.clicked.connect(show_computation)
