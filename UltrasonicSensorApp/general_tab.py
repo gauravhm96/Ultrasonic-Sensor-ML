@@ -1,7 +1,12 @@
-from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QFileDialog,QSizePolicy,QHBoxLayout,QDialog,QProgressBar,QApplication
+from PyQt5.QtWidgets import (QPushButton, QLabel, QVBoxLayout, 
+                             QFileDialog,QSizePolicy,QHBoxLayout,
+                             QDialog,QProgressBar,QApplication,QSpacerItem,QTextEdit,QGridLayout)
 from PyQt5.QtCore import Qt
 from SignalProcess import SignalProcessor
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 import time
+import numpy as np
 
 def add_general_features(layout,output_box):
    
@@ -50,7 +55,7 @@ def add_general_features(layout,output_box):
 
     # Add a QLabel to show the file path
     distance_label = QHBoxLayout()
-    distance_text_label = QLabel("Distance: ")
+    distance_text_label = QLabel("Distance from the Sensor to the Object: ")
     distance_text_label.setStyleSheet("font-size: 18px; padding: 5px;")
     distance_label.addWidget(distance_text_label)
 
@@ -94,7 +99,7 @@ def add_general_features(layout,output_box):
         # Simulate a long process by updating the progress bar in increments
         for i in range(101):  # Increment from 0 to 100
             progress_bar.setValue(i)
-            time.sleep(0.03)  # Simulate a time-consuming task
+            time.sleep(0.05)  # Simulate a time-consuming task
             QApplication.processEvents()  # Update the UI during the loop
 
 
@@ -129,13 +134,96 @@ def add_general_features(layout,output_box):
     calculate_distance_button.clicked.connect(calculate_distance)
 
     # Adding the "Show Computation" button
-    show_computation_button = QPushButton("Show Computation")
+    show_computation_button = QPushButton("Show Calculations")
     show_computation_button.setStyleSheet("font-size: 18px; padding: 5px;")
     show_computation_button.setFixedWidth(show_computation_button.sizeHint().width())
     layout.addWidget(show_computation_button)
 
-    def show_computation():
-       # Placeholder: Add the logic to show computation results
-       output_box.append("Computation results will be displayed here.")
+    def show_calculation():
+       
+        dialog = QDialog()
+        dialog.setWindowTitle("Computation Results")
+        dialog.setFixedSize(2400, 1250)
+        
+        # Set up the layout for the dialog
+        layout = QVBoxLayout()
+        
+         # Add a title label
+        title_label = QLabel("Calculations")
+        title_label.setStyleSheet("font-size: 22px; font-weight: bold; padding: 10px;")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
 
-    show_computation_button.clicked.connect(show_computation)
+        # Add a text area to display results
+        results_label = QLabel("Distance calculation and signal processing details.")
+        results_label.setStyleSheet("font-size: 18px; padding: 10px;")
+        results_label.setWordWrap(True)
+        layout.addWidget(results_label)
+        
+        # Add a "Read Data" button
+        read_data_button = QPushButton("Read Data")
+        
+        read_data_button.setFixedSize(100, 30)
+        read_data_button.setFixedWidth(show_computation_button.sizeHint().width())
+        read_data_button.setStyleSheet("font-size: 18px; padding: 5px;")
+        layout.addWidget(read_data_button, alignment=Qt.AlignLeft)
+        
+            # Add an output box below the "Read Data" button
+        output_box = QTextEdit()
+        output_box.setReadOnly(True) 
+        output_box.setStyleSheet("font-size: 16px; padding: 10px; background-color: #f4f4f4; border: 1px solid #ccc;")
+        output_box.setFixedHeight(200)  # Set a fixed height for the output box
+        layout.addWidget(output_box)
+        
+        # Create a grid layout for the plots
+        plots_layout = QGridLayout()
+        # Add 8 plots in a 2x4 grid
+        
+        fig1, axs1 = signalprocess.PlotRawSignal()
+        fig1.set_size_inches(10, 6)
+        canvas1 = FigureCanvas(fig1)
+        
+        fig2,axs2 = signalprocess.PlotNoiseFilteredSignal()
+        fig2.set_size_inches(10, 6)
+        canvas2 = FigureCanvas(fig2)
+        
+        fig3,axs3 = signalprocess.PlotSignalCorrection()
+        fig3.set_size_inches(20, 6)
+        canvas3 = FigureCanvas(fig3)
+
+        plots_layout.setSpacing(20)
+        plots_layout.setContentsMargins(20, 20, 20, 20) 
+        plots_layout.addWidget(canvas1, 0, 0)
+        plots_layout.addWidget(canvas2, 0, 1)
+        plots_layout.addWidget(canvas3, 1, 0, 1, 2)
+        
+        # Add the plots layout to the main layout
+        layout.addLayout(plots_layout)
+        
+        # Connect the "Read Data" button to a function
+        def read_data():
+            try:
+                input_data = signalprocess.PrintInputdata()        
+                output_box.append(f"Input Date:\n{input_data}")
+            except Exception as e:
+                output_box.append(f"Error Reading Data:{e}")
+
+        read_data_button.clicked.connect(read_data)
+
+        # Add a spacer to push the Close button to the bottom
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+        
+        # Add a close button
+        close_button = QPushButton("Close")
+        close_button.setFixedSize(100, 30)
+        close_button.setStyleSheet("font-size: 18px; padding: 5px;")
+        close_button.clicked.connect(dialog.close)  # Close the dialog when clicked
+        layout.addWidget(close_button, alignment=Qt.AlignCenter)
+
+        dialog.setLayout(layout)
+        dialog.exec()
+       
+        output_box.append("Computation results will be displayed here.")
+
+    show_computation_button.clicked.connect(show_calculation)

@@ -53,7 +53,6 @@ class SettingsWindow(QMainWindow):
             "background-color: white; border: 1px solid gray; font-size: 18px; padding: 5px;"
         )
         self.output_box.setFixedHeight(250)  # Adjust height as needed
-        self.output_box.append("Logs will appear here.")  # Initial message
 
         # Add tabs to the tab widget
         tab_widget.addTab(self.general_tab(), "General")
