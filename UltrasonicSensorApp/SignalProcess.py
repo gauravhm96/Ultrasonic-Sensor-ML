@@ -101,6 +101,7 @@ class SignalProcessor:
         "overall_threshold_index": overall_threshold_index,
         "filtered_signal": filtered_signal
         }
+        return self.updated_signal_dictionary, self.threshold_info
          
     def SignalCorrection(self):
         # Apply Savitzky-Golay filtering
