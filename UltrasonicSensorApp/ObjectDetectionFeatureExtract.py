@@ -274,32 +274,8 @@ class FeatureExtract:
         
             # Close the figure to avoid memory leaks
             plt.close(fig)
-
-
-if __name__ == "__main__":
-    file_path = 'C:\\@DevDocs\\Projects\\Mine\\New folder\\Ultrasonic-Sensor-ML\\UltrasonicSensorApp\\Raw_Data\\adc_38.txt'
-
-    extractfeature = FeatureExtract()
-    ProcessSignal = SignalProcessor()
-    ProcessSignal.set_file_path(file_path)
-    ProcessSignal.load_signal_data()
-    ProcessSignal.analyze_raw_signals()
-    ProcessSignal.annotate_real_peaks()
-    updated_signals, threshold_info = ProcessSignal.NoiseFiltering()
-    updated_signals, overall_threshold = extractfeature.apply_threshold_filtering(updated_signals)
-    selected_peak_windows = extractfeature.extract_peak_windows(updated_signals)
-    window_duration,ADC_SAMPLE_FREQUENCY = extractfeature.calulate_window(num_samples_per_window=300)
     
-    #folder_path = r"C:\@DevDocs\Projects\Mine\New folder\Ultrasonic-Sensor-ML\UltrasonicSensorApp\peak_spectrogram1"
-    #extractfeature.save_PeakSspectrogramsType_1(selected_peak_windows,updated_signals,folder_path,num_samples_per_window= 300,ADC_SAMPLE_FREQUENCY=ADC_SAMPLE_FREQUENCY)
-
-    #folder_path = r"C:\@DevDocs\Projects\Mine\New folder\Ultrasonic-Sensor-ML\UltrasonicSensorApp\peak_spectrogram2"
-    #figure_size = (3, 3)
-    #extractfeature.save_PeakSspectrogramsType_2(selected_peak_windows, folder_path, figure_size)
-    
-    selected_non_peak_windows = extractfeature.extract_non_peak_windows(updated_signals)
-    folder_path = r"C:\@DevDocs\Projects\Mine\New folder\Ultrasonic-Sensor-ML\UltrasonicSensorApp\nonpeak_spectrogram"
-    extractfeature.save_NonPeakSspectrograms(selected_non_peak_windows, folder_path)
+ 
 
     
     

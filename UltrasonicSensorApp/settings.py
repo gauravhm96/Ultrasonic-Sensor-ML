@@ -16,6 +16,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 import sys
 from general_tab import add_general_features
+from distanceML import distanceMLFeatureExtract
 
 
 class SettingsWindow(QMainWindow):
@@ -56,6 +57,7 @@ class SettingsWindow(QMainWindow):
 
         # Add tabs to the tab widget
         tab_widget.addTab(self.general_tab(), "General")
+        tab_widget.addTab(self.ML_tab(), "ML Tab")
         tab_widget.addTab(self.advanced_tab(), "Advanced")
         tab_widget.addTab(self.about_tab(), "About")
 
@@ -100,8 +102,7 @@ class SettingsWindow(QMainWindow):
 
     def cancel_action(self):
         """Handle Cancel button click."""
-        self.output_box.append("Cancel button clicked.")
-        print("Cancel button clicked.")
+        sys.exit("Program terminated by user.")
 
     def general_tab(self):
 
@@ -115,6 +116,24 @@ class SettingsWindow(QMainWindow):
        
         # Call the function from features.py to add more features
         add_general_features(layout,self.output_box)  # This will add the additional features to the layout  
+
+        layout.addStretch()  # Push contents to the top
+
+        tab.setLayout(layout)
+        return tab
+    
+    def ML_tab(self):
+
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("Machine Learning")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        layout.addWidget(label)
+       
+        # Call the function from features.py to add more features
+        distanceMLFeatureExtract(layout,self.output_box)   
 
         layout.addStretch()  # Push contents to the top
 
