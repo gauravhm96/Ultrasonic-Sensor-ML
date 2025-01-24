@@ -38,6 +38,7 @@ class BinaryImageClassifier:
         return train_test_split(images, labels, test_size=0.2, random_state=42)
 
     def build_model(self):
+        print("Building the model...")
         model = Sequential()
 
         # First conv block
@@ -67,13 +68,20 @@ class BinaryImageClassifier:
 
         model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
         self.model = model
+        print("Model built successfully.")
 
     def train_model(self, x_train, y_train, x_val, y_val):
+        print("Training the model...")
         early_stopping = EarlyStopping(monitor='val_loss', patience=self.patience)
         self.model.fit(x_train, y_train, validation_data=(x_val, y_val), 
                        epochs=self.epochs, batch_size=self.batch_size, callbacks=[early_stopping])
+        history = self.model.fit(x_train, y_train, validation_data=(x_val, y_val), 
+                                 epochs=self.epochs, batch_size=self.batch_size, callbacks=[early_stopping])
+        print("Training completed.")
+        print("Training history:", history.history)
 
     def evaluate_model(self, x_val, y_val):
+        print("Evaluating the model...")
         score = self.model.evaluate(x_val, y_val, verbose=0)
         print(f'Test loss: {score[0]}')
         print(f'Test accuracy: {score[1]}')
@@ -91,4 +99,5 @@ if __name__ == "__main__":
     x_train, x_val, y_train, y_val = classifier.load_and_prepare_data()
     classifier.build_model()
     classifier.train_model(x_train, y_train, x_val, y_val)
-    classifier.evaluate_model(x_val, y_val)
+    results = classifier.evaluate_model(x_val, y_val)
+    print("Final Evaluation Results:", results)

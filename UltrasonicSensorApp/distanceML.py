@@ -3,11 +3,12 @@ import time
 import os
 from PyQt5.QtWidgets import (QPushButton, QLabel, QVBoxLayout,
                              QFileDialog,QSizePolicy,QHBoxLayout,
-                             QDialog,QProgressBar,QApplication,QSpacerItem,QTextEdit,QGridLayout)
+                             QDialog,QProgressBar,QApplication,QSpacerItem,QTextEdit,QGridLayout,QSpacerItem)
 from PyQt5.QtCore import Qt,QCoreApplication
 
 from SignalProcess import SignalProcessor
 from ObjectDetectionFeatureExtract import FeatureExtract
+from ObjectDetectionTraining import BinaryImageClassifier
 
 def distanceMLFeatureExtract(layout,output_box):
     
@@ -286,4 +287,107 @@ def distanceMLFeatureExtract(layout,output_box):
         output_box.append("Spectrograms Generated...!!")
         
     GenerateSpectogramNonPeaks_button.clicked.connect(Generate_Spectogram_NonPeaks)
+    
+    # Layout for Train and Predict buttons
+    TrainPredictLayout = QHBoxLayout()
+    
+    # Align buttons closely by stretching only the surrounding space
+    TrainPredictLayout.addStretch()
+    
+    # Train Button
+    Train_button = QPushButton("Train")
+    Train_button.setStyleSheet("font-size: 18px; padding: 5px;")
+    Train_button.setFixedWidth(120)
+    Train_button.setEnabled(True)  # Enable/Disable based on your logic
+    TrainPredictLayout.addWidget(Train_button)
+    
+    TrainPredictLayout.addSpacing(10)
+    
+    # Predict Button
+    Predict_button = QPushButton("Predict")
+    Predict_button.setStyleSheet("font-size: 18px; padding: 5px;")
+    Predict_button.setFixedWidth(120)
+    Predict_button.setEnabled(True)  # Enable/Disable based on your logic
+    TrainPredictLayout.addWidget(Predict_button)
+    
+    # Add stretch after the buttons to center-align
+    TrainPredictLayout.addStretch()
+    
+    layout.addSpacing(10)
+    
+    # Add the layout below the NonPeakSpectogramLayout
+    layout.addLayout(TrainPredictLayout)
+
+    # Define actions for Train and Predict buttons
+    def train_model():
+        output_box.append("Training model...")
+        
+        # Create a modal dialog
+        dialog = QDialog()
+        dialog.setWindowTitle("Training Progress")
+        dialog.setModal(True)
+        dialog.setFixedSize(300, 150)
+        
+        # Create the layout for the dialog
+        layout = QVBoxLayout()
+        
+        # Add a label to show the status
+        status_label = QLabel("Training model, please wait...")
+        status_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(status_label)
+        
+        # Add a progress bar
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        layout.addWidget(progress_bar)
+        
+        # Add a "Close" button
+        close_button = QPushButton("Close")
+        close_button.setStyleSheet("font-size: 18px; padding: 5px;")
+        close_button.setFixedWidth(select_file_button.sizeHint().width())
+        close_button.setEnabled(False)
+        close_button.clicked.connect(dialog.accept)
+        layout.addWidget(close_button)
+        
+        # Set the layout to the dialog
+        dialog.setLayout(layout)
+        
+        dialog.show()
+                
+        # Function to update the progress
+        def progress(start,end):
+            for value in range(start, end + 1):
+                QCoreApplication.processEvents()  # Keep GUI responsive
+                time.sleep(0.05) 
+                progress_bar.setValue(value)
+
+        progress(0,10)
+        folder_path = os.path.dirname(os.path.abspath(__file__))
+        PeakSpectrogram = os.path.join(folder_path, "PeakspectrogramType1")
+        NonPeakSpectrogram = os.path.join(folder_path, "NonPeakspectrogram")
+
+        classifier = BinaryImageClassifier(PeakSpectrogram, NonPeakSpectrogram)
+        progress(10,30)
+        x_train, x_val, y_train, y_val = classifier.load_and_prepare_data()
+        progress(30,45)
+        classifier.build_model()
+        progress(45,55)
+        classifier.train_model(x_train, y_train, x_val, y_val)
+        progress(55,90)
+        results = classifier.evaluate_model(x_val, y_val)
+        print("Final Evaluation Results:", results)
+        progress_bar.setValue(100)  # Update progress to 100%
+        close_button.setEnabled(True)
+        # Add training logic here
+        output_box.append("Model training completed!")
+        dialog.exec_()  # Now allow user interaction to close the dialog
+
+    def predict_results():
+        output_box.append("Predicting results...")
+        # Add prediction logic here
+        output_box.append("Prediction completed!")
+
+    # Connect buttons to their respective functions
+    Train_button.clicked.connect(train_model)
+    Predict_button.clicked.connect(predict_results)
     
