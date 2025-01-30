@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.stats import skew, kurtosis
+from scipy.special import entr
+from scipy.stats import entropy
 
 class FftSignal:
     def __init__(self):
@@ -491,12 +493,60 @@ class statistical_features:
     
     def getrelativepeakspectral(self,amplitudebuffer):
         relative_spectral_peak = (np.max(amplitudebuffer, axis=0)) / np.sum(amplitudebuffer, axis=0)
-        self.features['relative_spectral_peak'] = relative_spectral_peak
+        self.features['relative_spectr8al_peak'] = relative_spectral_peak
         return relative_spectral_peak
+         
         
+class extract_time_domain_features:
+    def __init__(self):
+        self.features = {}
+        fft_signal = FftSignal()
+        frequencyspectrum   = fft_signal.getfrequencyspectrum(signal_data)
+        self.frequency_spectrum = np.array(frequencyspectrum)
+        
+    def spectral_centroid(self, amplitudebuffer):
+        # Weighted sum of frequencies
+        numerator = np.sum(self.frequency_spectrum * amplitudebuffer, axis=1)
+        denominator = np.sum(amplitudebuffer, axis=1) + 1e-10  # Avoid division by zero
+        return numerator / denominator
+    
+    def spectral_spread(self, amplitudebuffer, centroid):
+        centroid = np.array(centroid)
+        amplitudebuffer = np.array(amplitudebuffer)
+        # Spread around the centroid
+        spread = np.sqrt(np.sum(((self.frequency_spectrum - centroid[:, None])**2) * amplitudebuffer, axis=1) /
+                         (np.sum(amplitudebuffer, axis=1) + 1e-10))
+        return spread
 
+    def spectral_skewness(self, amplitudebuffer, centroid, spread):
+        # Skewness of frequency distribution
+        centroid = np.array(centroid)
+        spread = np.array(spread)
+        amplitudebuffer = np.array(amplitudebuffer)
+        skewness = np.sum(((self.frequency_spectrum - centroid[:, None])**3) * amplitudebuffer, axis=1) / \
+                   (spread**3 * np.sum(amplitudebuffer, axis=1) + 1e-10)
+        return skewness
+
+    def spectral_kurtosis(self, amplitudebuffer, centroid, spread):
+        # Kurtosis of frequency distribution
+        centroid = np.array(centroid)
+        spread = np.array(spread)
+        amplitudebuffer = np.array(amplitudebuffer)
+        kurtosis = np.sum(((self.frequency_spectrum - centroid[:, None])**4) * amplitudebuffer, axis=1) / \
+                   (spread**4 * np.sum(amplitudebuffer, axis=1) + 1e-10)
+        return kurtosis
+
+    def total_energy(self, amplitudebuffer):
+        amplitudebuffer = np.array(amplitudebuffer)
+        return np.sum(amplitudebuffer**2, axis=1)
+
+    def entropy(self, amplitudebuffer):
+        amplitudebuffer = np.array(amplitudebuffer)
+        prob_dist = amplitudebuffer / (np.sum(amplitudebuffer, axis=1, keepdims=True) + 1e-10)
+        return np.sum(entr(prob_dist), axis=1)
+  
 if __name__ == "__main__":
-    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_65_Hand.txt'
+    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
     folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_110_Wall.txt'
     
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_40_Wall.txt'
@@ -543,7 +593,6 @@ if __name__ == "__main__":
        getmargin       = extractfeatures.getmargin(amplitudebuffer)
        RelativePekSpec = extractfeatures.getrelativepeakspectral(amplitudebuffer)
        
-
        amplitudebuffer_list = []
        #amplitudebuffer_list.append(amplitudebuffer)
        #amplitudebuffer_list.append(smooth)
@@ -562,8 +611,44 @@ if __name__ == "__main__":
        amplitudebuffer_list.append(getmargin)
        amplitudebuffer_list.append(RelativePekSpec)
               
-       fft_signal.plot_data(frequencyspectrum,amplitudebuffer_list)
+       #fft_signal.plot_data(frequencyspectrum,amplitudebuffer_list)
        print("MATLAB-style FFT plots saved successfully.")
+       
+       timedomainfeatures = extract_time_domain_features()
+
+       centroid = timedomainfeatures.spectral_centroid(amplitudebuffer)
+       spread = timedomainfeatures.spectral_spread(amplitudebuffer, centroid)
+       skewness = timedomainfeatures.spectral_skewness(amplitudebuffer, centroid, spread)
+       kurtosiss = timedomainfeatures.spectral_kurtosis(amplitudebuffer, centroid, spread)
+       energy = timedomainfeatures.total_energy(amplitudebuffer)
+       entropy_values = timedomainfeatures.entropy(amplitudebuffer)
+
+       rows = len(centroid)  # Should be 200
+       x_axis = np.arange(rows)
+       
+       features = {
+        "Spectral Centroid": centroid,
+        "Spectral Spread": spread,
+        "Spectral Skewness": skewness,
+        "Spectral Kurtosis": kurtosiss,
+        "Total Energy": energy,
+        "Spectral Entropy": entropy_values
+        }
+       
+       plt.figure(figsize=(15, 10))  # Set overall figure size
+       
+       for i, (feature_name, values) in enumerate(features.items()):
+           plt.subplot(2, 3, i + 1)  # 2 rows, 3 columns
+           plt.plot(x_axis, values, label=feature_name, color='b')
+           plt.xlabel("Row Index (Time Steps)")
+           plt.ylabel(feature_name)
+           plt.title(feature_name)
+           plt.grid(True)
+           plt.legend()
+
+       plt.tight_layout()  # Adjust layout for better spacing
+       plt.show()
+       
        #peak_frequencies = fft_signal.calculate_F2(signal_data)
        #print("Peak Frequencies:", peak_frequencies)
 

@@ -1,36 +1,61 @@
 import numpy as np
 import pandas as pd
-import math
 
-# Function to calculate Shannon Entropy
-def calculate_entropy(data):
-    # Normalize the data to get the probability distribution
-    prob_dist = data / np.sum(data)  # This gives the probability distribution
-    # Calculate entropy using Shannon's formula
-    entropy = -np.sum(prob_dist * np.log2(prob_dist + 1e-10))  # Adding a small value to avoid log(0)
-    return entropy
+# Example raw amplitude data (200 time samples, 5 frequency bins)
+raw_data = np.random.random((200, 5)) * 100  # Random amplitude data between 0 and 100
+amplitude_buffer = pd.DataFrame(raw_data)
 
-# Assuming signal_data is your dataframe with frequency spectrum and amplitude buffer
-def get_entropy_for_rows(signal_data):
-    entropies = []
-    for row in signal_data.itertuples(index=False):
-        # Each row is treated as a frequency bin (or amplitude buffer row)
-        row_data = np.array(row)  # Convert tuple to numpy array
-        row_entropy = calculate_entropy(row_data)  # Calculate entropy for the row
-        entropies.append(row_entropy)
-    
-    return entropies
+print(amplitude_buffer.head())
 
-# Example data (for testing)
-# Replace this with your actual signal data, which will have rows and columns as required
-signal_data = pd.DataFrame(np.random.random((200, 85)))  # Example random data (200 rows, 85 frequency bins)
 
-# Calculate entropy for each row (you can use the frequency spectrum or amplitude buffer)
-row_entropies = get_entropy_for_rows(signal_data)
+# Calculate row-wise mean and max amplitude
+mean_amplitude = amplitude_buffer.mean(axis=1)  # Mean along each row (axis=1)
+max_amplitude = amplitude_buffer.max(axis=1)    # Max along each row (axis=1)
 
-# Print the calculated entropy values
-print("Entropy for each row:", row_entropies)
+# Create a new DataFrame to store the extracted features
+features_df = pd.DataFrame({
+    'Mean Amplitude': mean_amplitude,
+    'Max Amplitude': max_amplitude
+})
 
-# Optional: Find the row with the maximum entropy (indicating the row with the highest variability)
-max_entropy_index = np.argmax(row_entropies)
-print(f"Row with maximum entropy: {max_entropy_index}, Entropy: {row_entropies[max_entropy_index]}")
+print(features_df.head())
+
+import matplotlib.pyplot as plt
+
+# Assuming raw_signal is the original amplitude buffer (200x85)
+# Assuming features_df contains the extracted features (Mean Amplitude and Max Amplitude)
+
+plt.figure(figsize=(14, 8))
+
+# Plot Raw Signal (First column of amplitude buffer)
+plt.subplot(3, 1, 1)
+plt.plot(amplitude_buffer.iloc[0, :], label='Raw Signal (First Time Sample)', color='gray')
+plt.title('Raw Signal (First Time Sample) vs Frequency')
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('Amplitude')
+plt.grid(True)
+plt.legend()
+
+# Plot Mean Amplitude
+plt.subplot(3, 1, 2)
+plt.plot(features_df['Mean Amplitude'], label='Mean Amplitude', color='blue')
+plt.title('Mean Amplitude vs Time')
+plt.xlabel('Time (Samples)')
+plt.ylabel('Mean Amplitude')
+plt.grid(True)
+plt.legend()
+
+# Plot Max Amplitude
+plt.subplot(3, 1, 3)
+plt.plot(features_df['Max Amplitude'], label='Max Amplitude', color='red')
+plt.title('Max Amplitude vs Time')
+plt.xlabel('Time (Samples)')
+plt.ylabel('Max Amplitude')
+plt.grid(True)
+plt.legend()
+
+# Display the plot
+plt.tight_layout()
+plt.show()
+
+
