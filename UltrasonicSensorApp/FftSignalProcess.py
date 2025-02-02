@@ -345,47 +345,47 @@ class FftSignal:
     
     def getfrequencyspectrum(self,signal_data):   
         frequencyspectrum = signal_data.iloc[0, :]  # First row as x-axis labels (frequency values)
-        print("Frequency Row:", frequencyspectrum)
+        #print("Frequency Row:", frequencyspectrum)
         return frequencyspectrum
     
     def getamplitude(self,signal_data):
         amplitude_buffer = signal_data.iloc[1:, :] 
-        print("Amplitude Buffer:", amplitude_buffer)
+        #print("Amplitude Buffer:", amplitude_buffer)
         return amplitude_buffer
     
     def getFmax(self,frequencyspectrum):      
         fmax = frequencyspectrum.max()
-        print("Max Frequency (fmax): {} Hz".format(fmax))
+        #print("Max Frequency (fmax): {} Hz".format(fmax))
         return fmax
         
     def getFmin(self,frequencyspectrum):
         fmin = frequencyspectrum.min()
-        print("Min Frequency (fmin): {} Hz".format(fmin))
+        #print("Min Frequency (fmin): {} Hz".format(fmin))
         return fmin
         
     def getBW(self,fmax,fmin):
         BW = fmax - fmin
-        print("Freq Bandwidth: {} Hz".format(BW))
+        #print("Freq Bandwidth: {} Hz".format(BW))
         return BW
         
     def getSamplingFrequency(self):
         ADC_MAX_SAMPLE_FREQUENCY = 125_000_000  # 125 MHz
         ADC_SAMPLE_DECIMATION = 64
         sampling_frequency = ADC_MAX_SAMPLE_FREQUENCY / ADC_SAMPLE_DECIMATION
-        print(f"Sampling Frequency (f_s): {sampling_frequency} Hz")
+        #print(f"Sampling Frequency (f_s): {sampling_frequency} Hz")
         return sampling_frequency
 
         
     def getfreqfactor(self,sampling_frequency):
         window_width = 8192  # FFT points (window width)
         freq_factor = sampling_frequency / (window_width * 2)
-        print(f"Frequency Factor: {freq_factor} Hz")
+        #print(f"Frequency Factor: {freq_factor} Hz")
         return freq_factor
     
     def getFreqresolution(self,BW):
         window_width = 8192  # FFT points (window width)
         freq_resolution = BW / window_width
-        print(f"Frequency Resolution (Delta f): {freq_resolution:.2f} Hz")
+        #print(f"Frequency Resolution (Delta f): {freq_resolution:.2f} Hz")
         return freq_resolution
         
 class statistical_features:
@@ -500,39 +500,41 @@ class statistical_features:
 class extract_time_domain_features:
     def __init__(self):
         self.features = {}
-        fft_signal = FftSignal()
-        frequencyspectrum   = fft_signal.getfrequencyspectrum(signal_data)
-        self.frequency_spectrum = np.array(frequencyspectrum)
         
-    def spectral_centroid(self, amplitudebuffer):
+    def spectral_centroid(self,frequencyspectrum,amplitudebuffer):
         # Weighted sum of frequencies
-        numerator = np.sum(self.frequency_spectrum * amplitudebuffer, axis=1)
+        frequency_spectrum = np.array(frequencyspectrum)
+        numerator = np.sum(frequency_spectrum * amplitudebuffer, axis=1)
         denominator = np.sum(amplitudebuffer, axis=1) + 1e-10  # Avoid division by zero
         return numerator / denominator
     
-    def spectral_spread(self, amplitudebuffer, centroid):
+    def spectral_spread(self,frequencyspectrum,amplitudebuffer, centroid):
         centroid = np.array(centroid)
+        frequency_spectrum = np.array(frequencyspectrum)
         amplitudebuffer = np.array(amplitudebuffer)
         # Spread around the centroid
-        spread = np.sqrt(np.sum(((self.frequency_spectrum - centroid[:, None])**2) * amplitudebuffer, axis=1) /
+        spread = np.sqrt(np.sum(((frequency_spectrum - centroid[:, None])**2) * amplitudebuffer, axis=1) /
                          (np.sum(amplitudebuffer, axis=1) + 1e-10))
+        
         return spread
 
-    def spectral_skewness(self, amplitudebuffer, centroid, spread):
+    def spectral_skewness(self,frequencyspectrum,amplitudebuffer, centroid, spread):
         # Skewness of frequency distribution
         centroid = np.array(centroid)
         spread = np.array(spread)
+        frequency_spectrum = np.array(frequencyspectrum)
         amplitudebuffer = np.array(amplitudebuffer)
-        skewness = np.sum(((self.frequency_spectrum - centroid[:, None])**3) * amplitudebuffer, axis=1) / \
+        skewness = np.sum(((frequency_spectrum - centroid[:, None])**3) * amplitudebuffer, axis=1) / \
                    (spread**3 * np.sum(amplitudebuffer, axis=1) + 1e-10)
         return skewness
 
-    def spectral_kurtosis(self, amplitudebuffer, centroid, spread):
+    def spectral_kurtosis(self,frequencyspectrum,amplitudebuffer, centroid, spread):
         # Kurtosis of frequency distribution
         centroid = np.array(centroid)
         spread = np.array(spread)
+        frequency_spectrum = np.array(frequencyspectrum)
         amplitudebuffer = np.array(amplitudebuffer)
-        kurtosis = np.sum(((self.frequency_spectrum - centroid[:, None])**4) * amplitudebuffer, axis=1) / \
+        kurtosis = np.sum(((frequency_spectrum - centroid[:, None])**4) * amplitudebuffer, axis=1) / \
                    (spread**4 * np.sum(amplitudebuffer, axis=1) + 1e-10)
         return kurtosis
 
@@ -611,15 +613,15 @@ if __name__ == "__main__":
        amplitudebuffer_list.append(getmargin)
        amplitudebuffer_list.append(RelativePekSpec)
               
-       #fft_signal.plot_data(frequencyspectrum,amplitudebuffer_list)
+       fft_signal.plot_data(frequencyspectrum,amplitudebuffer_list)
        print("MATLAB-style FFT plots saved successfully.")
        
        timedomainfeatures = extract_time_domain_features()
 
-       centroid = timedomainfeatures.spectral_centroid(amplitudebuffer)
-       spread = timedomainfeatures.spectral_spread(amplitudebuffer, centroid)
-       skewness = timedomainfeatures.spectral_skewness(amplitudebuffer, centroid, spread)
-       kurtosiss = timedomainfeatures.spectral_kurtosis(amplitudebuffer, centroid, spread)
+       centroid = timedomainfeatures.spectral_centroid(frequencyspectrum,amplitudebuffer)
+       spread = timedomainfeatures.spectral_spread(frequencyspectrum,amplitudebuffer, centroid)
+       skewness = timedomainfeatures.spectral_skewness(frequencyspectrum,amplitudebuffer, centroid, spread)
+       kurtosiss = timedomainfeatures.spectral_kurtosis(frequencyspectrum,amplitudebuffer, centroid, spread)
        energy = timedomainfeatures.total_energy(amplitudebuffer)
        entropy_values = timedomainfeatures.entropy(amplitudebuffer)
 
