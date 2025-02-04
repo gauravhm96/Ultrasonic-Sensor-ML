@@ -7,6 +7,12 @@ from scipy.stats import skew, kurtosis
 from scipy.special import entr
 from scipy.stats import entropy
 
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+import matplotlib.pyplot as plt
+
+
 class FftSignal:
     def __init__(self):
         self.folder_path = None
@@ -64,6 +70,11 @@ class FftSignal:
         plt.tight_layout()
         plt.show()   
 
+
+class ExtractFeaturesFFT: 
+    def __init__(self):
+         pass
+
     def calculate_F2(self, signal_data):
 
         # Extract the first row for x-axis labels (frequencies)
@@ -89,7 +100,6 @@ class FftSignal:
 
         # Return the list of peak frequencies
         return peak_frequencies
-
 
     def calculate_F1(self,peak_frequencies):
         # Calculate the mean difference of F2 over 10 measurements (moving window)
@@ -343,52 +353,47 @@ class FftSignal:
         print(max_peak_info)
         return max_peak_info
     
+class getFFTSignalParameters:
+    def __init__(self):
+        pass
+    
     def getfrequencyspectrum(self,signal_data):   
         frequencyspectrum = signal_data.iloc[0, :]  # First row as x-axis labels (frequency values)
-        #print("Frequency Row:", frequencyspectrum)
         return frequencyspectrum
     
     def getamplitude(self,signal_data):
         amplitude_buffer = signal_data.iloc[1:, :] 
-        #print("Amplitude Buffer:", amplitude_buffer)
         return amplitude_buffer
     
     def getFmax(self,frequencyspectrum):      
         fmax = frequencyspectrum.max()
-        #print("Max Frequency (fmax): {} Hz".format(fmax))
         return fmax
         
     def getFmin(self,frequencyspectrum):
         fmin = frequencyspectrum.min()
-        #print("Min Frequency (fmin): {} Hz".format(fmin))
         return fmin
         
     def getBW(self,fmax,fmin):
         BW = fmax - fmin
-        #print("Freq Bandwidth: {} Hz".format(BW))
         return BW
         
     def getSamplingFrequency(self):
         ADC_MAX_SAMPLE_FREQUENCY = 125_000_000  # 125 MHz
         ADC_SAMPLE_DECIMATION = 64
         sampling_frequency = ADC_MAX_SAMPLE_FREQUENCY / ADC_SAMPLE_DECIMATION
-        #print(f"Sampling Frequency (f_s): {sampling_frequency} Hz")
         return sampling_frequency
 
-        
     def getfreqfactor(self,sampling_frequency):
         window_width = 8192  # FFT points (window width)
         freq_factor = sampling_frequency / (window_width * 2)
-        #print(f"Frequency Factor: {freq_factor} Hz")
         return freq_factor
     
     def getFreqresolution(self,BW):
         window_width = 8192  # FFT points (window width)
         freq_resolution = BW / window_width
-        #print(f"Frequency Resolution (Delta f): {freq_resolution:.2f} Hz")
         return freq_resolution
         
-class statistical_features:
+class getFFTSignalFreqDomainFeatures:
     def __init__(self):
         self.features = {}
         
@@ -495,9 +500,71 @@ class statistical_features:
         relative_spectral_peak = (np.max(amplitudebuffer, axis=0)) / np.sum(amplitudebuffer, axis=0)
         self.features['relative_spectr8al_peak'] = relative_spectral_peak
         return relative_spectral_peak
-         
+    
+    def getfreqPCA(self,frequencyspectrum,amplitudebuffer):
+        extract = getFFTSignalFreqDomainFeatures()
         
-class extract_time_domain_features:
+        MeanAmplitude   = extract.getMeanAmplitude(amplitudebuffer)
+        MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
+        PeaktoPeak      = extract.getPeakToPeak(amplitudebuffer)
+        RMSAmplitude    = extract.getRMSAmplitude(amplitudebuffer)
+        Variance        = extract.getVariance(amplitudebuffer)
+        StdDev          = extract.getStdDev(amplitudebuffer)
+        Skewness        = extract.getSkewness(amplitudebuffer)
+        Kurtosis        = extract.getKurtosis(amplitudebuffer)
+        Totalpower      = extract.gettotalpower(amplitudebuffer)
+        crestfactor     = extract.getcrestfactor(amplitudebuffer)
+        formfactor      = extract.getformfactor(amplitudebuffer)
+        peaktomeanratio = extract.getpeaktomeanratio(amplitudebuffer)
+        getmargin       = extract.getmargin(amplitudebuffer)
+        RelativePekSpec = extract.getrelativepeakspectral(amplitudebuffer)
+        
+        fftfeatureslist = [
+                    MeanAmplitude,   # 1
+                    MaxAmplitude,    # 2
+                    PeaktoPeak,      # 3
+                    RMSAmplitude,    # 4
+                    Variance,        # 5
+                    StdDev,          # 6
+                    Skewness,        # 7
+                    Kurtosis,        # 8
+                    Totalpower,      # 9
+                    crestfactor,     # 10
+                    formfactor,      # 11
+                    peaktomeanratio, # 12
+                    getmargin,       # 13
+                    RelativePekSpec  # 14
+                ]
+        
+        features_array = np.array(fftfeatureslist)
+       
+        features_df = pd.DataFrame(features_array, columns=frequencyspectrum)
+       
+        features_df.index = [
+                            "MeanAmplitude", 
+                            "MaxAmplitude", 
+                            "PeakToPeak", 
+                            "RMSAmplitude", 
+                            "Variance", 
+                            "StdDev", 
+                            "Skewness", 
+                            "Kurtosis", 
+                            "TotalPower", 
+                            "CrestFactor", 
+                            "FormFactor", 
+                            "PeakToMeanRatio", 
+                            "Margin", 
+                            "RelativePeakSpectral"
+                        ]
+        # Step 1: Standardize the data (PCA works better on standardized data)
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(features_df.T)
+        # Step 2: Apply PCA
+        pca = PCA(n_components=1)
+        pca_result = pca.fit_transform(scaled_data)
+        return pca_result.T
+         
+class getFFTSignalTimeDomainFeatures:
     def __init__(self):
         self.features = {}
         
@@ -549,107 +616,113 @@ class extract_time_domain_features:
   
 if __name__ == "__main__":
     #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
-    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_110_Wall.txt'
+    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_110_Wall.txt'
+    
+    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human7.txt'
+    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing3.txt'
     
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_40_Wall.txt'
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_40_Hand.txt'
     
     fft_signal = FftSignal()
-    extractfeatures = statistical_features()
+    getparameter = getFFTSignalParameters()
+    extractfeatures = getFFTSignalFreqDomainFeatures()
 
     if folder_path is not None:
        signal_data = fft_signal.get_fft_data(folder_path)
        
-       frequencyspectrum   = fft_signal.getfrequencyspectrum(signal_data)
-       amplitudebuffer     = fft_signal.getamplitude(signal_data)
-       Fmax                = fft_signal.getFmax(frequencyspectrum)
-       Fmin                = fft_signal.getFmin(frequencyspectrum)
-       BW                  = fft_signal.getBW(Fmax,Fmin)
-       SamplingFrequency   = fft_signal.getSamplingFrequency()
-       FrequencyFactor     = fft_signal.getfreqfactor(SamplingFrequency)
-       FrequencyResolution = fft_signal.getFreqresolution(BW)
-       
-       #output_file_path = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Test/signal_data6.txt"  # Replace with the desired output path
-       #fft_signal.save_signal_data(signal_data, output_file_path)
+       #
+       # Get FFT Signal Parameters Example : Fmax, Fmin, Bandwidth Signal etc
+       # #
+       frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
+       amplitudebuffer     = getparameter.getamplitude(signal_data)
+       Fmax                = getparameter.getFmax(frequencyspectrum)
+       Fmin                = getparameter.getFmin(frequencyspectrum)
+       BW                  = getparameter.getBW(Fmax,Fmin)
+       SamplingFrequency   = getparameter.getSamplingFrequency()
+       FrequencyFactor     = getparameter.getfreqfactor(SamplingFrequency)
+       FrequencyResolution = getparameter.getFreqresolution(BW)
+           
+       PCAResult = extractfeatures.getfreqPCA(amplitudebuffer)
 
-       
-       entropy = extractfeatures.getentropy(amplitudebuffer)
-       print("Entropy for the whole amplitude buffer:", entropy)
-       
-       windowsize = extractfeatures.getwindowsize(entropy,FrequencyResolution)
-       
-       smooth = extractfeatures.smoothenAmplitude(amplitudebuffer,windowsize)
-       
-       MeanAmplitude   = extractfeatures.getMeanAmplitude(amplitudebuffer)
-       MaxAmplitude    = extractfeatures.getMaxAmplitude(amplitudebuffer)
-       PeaktoPeak      = extractfeatures.getPeakToPeak(amplitudebuffer)
-       RMSAmplitude    = extractfeatures.getRMSAmplitude(amplitudebuffer)
-       Variance        = extractfeatures.getVariance(amplitudebuffer)
-       StdDev          = extractfeatures.getStdDev(amplitudebuffer)
-       Skewness        = extractfeatures.getSkewness(amplitudebuffer)
-       Kurtosis        = extractfeatures.getKurtosis(amplitudebuffer)
-       Totalpower      = extractfeatures.gettotalpower(amplitudebuffer)
-       crestfactor     = extractfeatures.getcrestfactor(amplitudebuffer)
-       formfactor      = extractfeatures.getformfactor(amplitudebuffer)
-       peaktomeanratio = extractfeatures.getpeaktomeanratio(amplitudebuffer)
-       getmargin       = extractfeatures.getmargin(amplitudebuffer)
-       RelativePekSpec = extractfeatures.getrelativepeakspectral(amplitudebuffer)
-       
-       amplitudebuffer_list = []
-       #amplitudebuffer_list.append(amplitudebuffer)
-       #amplitudebuffer_list.append(smooth)
-       amplitudebuffer_list.append(MeanAmplitude)
-       amplitudebuffer_list.append(MaxAmplitude)
-       amplitudebuffer_list.append(PeaktoPeak)
-       amplitudebuffer_list.append(RMSAmplitude)
-       amplitudebuffer_list.append(Variance)
-       amplitudebuffer_list.append(StdDev)
-       amplitudebuffer_list.append(Skewness)
-       amplitudebuffer_list.append(Kurtosis)
-       amplitudebuffer_list.append(Totalpower)
-       amplitudebuffer_list.append(crestfactor)
-       amplitudebuffer_list.append(formfactor)
-       amplitudebuffer_list.append(peaktomeanratio)
-       amplitudebuffer_list.append(getmargin)
-       amplitudebuffer_list.append(RelativePekSpec)
-              
-       fft_signal.plot_data(frequencyspectrum,amplitudebuffer_list)
-       print("MATLAB-style FFT plots saved successfully.")
-       
-       timedomainfeatures = extract_time_domain_features()
-
-       centroid = timedomainfeatures.spectral_centroid(frequencyspectrum,amplitudebuffer)
-       spread = timedomainfeatures.spectral_spread(frequencyspectrum,amplitudebuffer, centroid)
-       skewness = timedomainfeatures.spectral_skewness(frequencyspectrum,amplitudebuffer, centroid, spread)
-       kurtosiss = timedomainfeatures.spectral_kurtosis(frequencyspectrum,amplitudebuffer, centroid, spread)
-       energy = timedomainfeatures.total_energy(amplitudebuffer)
-       entropy_values = timedomainfeatures.entropy(amplitudebuffer)
-
-       rows = len(centroid)  # Should be 200
-       x_axis = np.arange(rows)
-       
-       features = {
-        "Spectral Centroid": centroid,
-        "Spectral Spread": spread,
-        "Spectral Skewness": skewness,
-        "Spectral Kurtosis": kurtosiss,
-        "Total Energy": energy,
-        "Spectral Entropy": entropy_values
-        }
-       
-       plt.figure(figsize=(15, 10))  # Set overall figure size
-       
-       for i, (feature_name, values) in enumerate(features.items()):
-           plt.subplot(2, 3, i + 1)  # 2 rows, 3 columns
-           plt.plot(x_axis, values, label=feature_name, color='b')
-           plt.xlabel("Row Index (Time Steps)")
-           plt.ylabel(feature_name)
-           plt.title(feature_name)
-           plt.grid(True)
-           plt.legend()
-
-       plt.tight_layout()  # Adjust layout for better spacing
+       plt.figure(figsize=(10, 5))
+       plt.plot(range(1, 86), PCAResult.flatten(), marker='o', linestyle='-', color='r', alpha=0.7)
+       plt.xlabel("Frequency Bin Index")
+       plt.ylabel("PCA Component Value")
+       plt.title("PCA Across Frequency Bins (Transposed 1x85)")
+       plt.grid()
        plt.show()
+       print("Final PCA Result Shape:", PCAResult)
+
+    #    # Plot Mean Amplitude
+    #    plt.figure(figsize=(10, 5))
+    #    plt.plot(frequencyspectrum, MeanAmplitude, marker='o', linestyle='-', color='b', label='Mean Amplitude')
+    #    # Labels and Title
+    #    plt.xlabel("Index")
+    #    plt.ylabel("Mean Amplitude")
+    #    plt.title("Mean Amplitude Over Samples")
+    #    plt.legend()
+    #    plt.grid(True)
+
+    #     # Show the Plot
+    #    plt.show()
+       
+    #    mean_amplitude_value = np.mean(MeanAmplitude)
+    #    print(mean_amplitude_value)
+
+      
+    #    amplitudebuffer_list = []
+    #    amplitudebuffer_list.append(amplitudebuffer)
+    #    amplitudebuffer_list.append(smooth)
+    #    amplitudebuffer_list.append(MeanAmplitude)
+    #    amplitudebuffer_list.append(MaxAmplitude)
+    #    amplitudebuffer_list.append(PeaktoPeak)
+    #    amplitudebuffer_list.append(RMSAmplitude)
+    #    amplitudebuffer_list.append(Variance)
+    #    amplitudebuffer_list.append(StdDev)
+    #    amplitudebuffer_list.append(Skewness)
+    #    amplitudebuffer_list.append(Kurtosis)
+    #    amplitudebuffer_list.append(Totalpower)
+    #    amplitudebuffer_list.append(crestfactor)
+    #    amplitudebuffer_list.append(formfactor)
+    #    amplitudebuffer_list.append(peaktomeanratio)
+    #    amplitudebuffer_list.append(getmargin)
+    #    amplitudebuffer_list.append(RelativePekSpec)
+       
+    #    timedomainfeatures = getFFTSignalTimeDomainFeatures()
+
+    #    centroid = timedomainfeatures.spectral_centroid(frequencyspectrum,amplitudebuffer)
+    #    spread = timedomainfeatures.spectral_spread(frequencyspectrum,amplitudebuffer, centroid)
+    #    skewness = timedomainfeatures.spectral_skewness(frequencyspectrum,amplitudebuffer, centroid, spread)
+    #    kurtosiss = timedomainfeatures.spectral_kurtosis(frequencyspectrum,amplitudebuffer, centroid, spread)
+    #    energy = timedomainfeatures.total_energy(amplitudebuffer)
+    #    entropy_values = timedomainfeatures.entropy(amplitudebuffer)
+
+    #    rows = len(centroid)  # Should be 200
+    #    x_axis = np.arange(rows)
+     
+    #    features = {
+    #     "Spectral Centroid": centroid,
+    #     "Spectral Spread": spread,
+    #     "Spectral Skewness": skewness,
+    #     "Spectral Kurtosis": kurtosiss,
+    #     "Total Energy": energy,
+    #     "Spectral Entropy": entropy_values
+    #     }
+       
+    #    plt.figure(figsize=(15, 10))  # Set overall figure size
+       
+    #    for i, (feature_name, values) in enumerate(features.items()):
+    #        plt.subplot(2, 3, i + 1)  # 2 rows, 3 columns
+    #        plt.plot(x_axis, values, label=feature_name, color='b')
+    #        plt.xlabel("Row Index (Time Steps)")
+    #        plt.ylabel(feature_name)
+    #        plt.title(feature_name)
+    #        plt.grid(True)
+    #        plt.legend()
+
+    #    plt.tight_layout()  # Adjust layout for better spacing
+    #    plt.show()
        
        #peak_frequencies = fft_signal.calculate_F2(signal_data)
        #print("Peak Frequencies:", peak_frequencies)
