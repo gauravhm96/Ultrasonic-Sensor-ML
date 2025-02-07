@@ -1,22 +1,23 @@
+import sys
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QTabWidget,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
+    QMainWindow,
     QPushButton,
-    QSpacerItem,
     QSizePolicy,
+    QSpacerItem,
+    QTabWidget,
     QTextEdit,
-    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
-import sys
-from general_tab import add_general_features
+
 from distanceML import distanceMLFeatureExtract
+from general_tab import add_general_features
+from object_differentiation_tab import object_differentiation_features
 
 
 class SettingsWindow(QMainWindow):
@@ -59,6 +60,7 @@ class SettingsWindow(QMainWindow):
         tab_widget.addTab(self.general_tab(), "General")
         tab_widget.addTab(self.ML_tab(), "ML Tab")
         tab_widget.addTab(self.advanced_tab(), "Advanced")
+        tab_widget.addTab(self.Object_Differentiation(), "Object Differentiation")
         tab_widget.addTab(self.about_tab(), "About")
 
         # Add OK, Cancel, and Exit buttons at the bottom
@@ -80,7 +82,9 @@ class SettingsWindow(QMainWindow):
         exit_button.clicked.connect(self.close)
 
         # Add buttons to the layout with spacers
-        button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        button_layout.addSpacerItem(
+            QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        )
         button_layout.addWidget(ok_button)
         button_layout.addWidget(cancel_button)
         button_layout.addWidget(exit_button)
@@ -113,15 +117,17 @@ class SettingsWindow(QMainWindow):
         label.setStyleSheet("font-size: 18px; font-weight: bold;")
 
         layout.addWidget(label)
-       
+
         # Call the function from features.py to add more features
-        add_general_features(layout,self.output_box)  # This will add the additional features to the layout  
+        add_general_features(
+            layout, self.output_box
+        )  # This will add the additional features to the layout
 
         layout.addStretch()  # Push contents to the top
 
         tab.setLayout(layout)
         return tab
-    
+
     def ML_tab(self):
 
         tab = QWidget()
@@ -131,9 +137,9 @@ class SettingsWindow(QMainWindow):
         label.setStyleSheet("font-size: 18px; font-weight: bold;")
 
         layout.addWidget(label)
-       
+
         # Call the function from features.py to add more features
-        distanceMLFeatureExtract(layout,self.output_box)   
+        distanceMLFeatureExtract(layout, self.output_box)
 
         layout.addStretch()  # Push contents to the top
 
@@ -158,6 +164,21 @@ class SettingsWindow(QMainWindow):
         layout.addStretch()  # Push contents to the top
         tab.setLayout(layout)
         return tab
+    
+    def Object_Differentiation(self):
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("Object Differentiation")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        layout.addWidget(label)
+        
+        object_differentiation_features(layout, self.output_box)
+        
+        layout.addStretch()  # Push contents to the top
+        tab.setLayout(layout)
+        return tab
 
     def about_tab(self):
         """Create the About tab."""
@@ -178,10 +199,7 @@ class SettingsWindow(QMainWindow):
         layout.addStretch()  # Push contents to the top
         tab.setLayout(layout)
         return tab
+    
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = SettingsWindow()
-    window.show()
-    sys.exit(app.exec_())
+

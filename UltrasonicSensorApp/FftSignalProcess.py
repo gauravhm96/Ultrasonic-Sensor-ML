@@ -643,7 +643,7 @@ if __name__ == "__main__":
        FrequencyFactor     = getparameter.getfreqfactor(SamplingFrequency)
        FrequencyResolution = getparameter.getFreqresolution(BW)
            
-       PCAResult = extractfeatures.getfreqPCA(amplitudebuffer)
+       PCAResult = extractfeatures.getfreqPCA(frequencyspectrum,amplitudebuffer)
 
        plt.figure(figsize=(10, 5))
        plt.plot(range(1, 86), PCAResult.flatten(), marker='o', linestyle='-', color='r', alpha=0.7)
