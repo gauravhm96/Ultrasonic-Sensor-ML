@@ -28,35 +28,27 @@ class Predict_FFT:
             frequencyspectrum = getparameter.getfrequencyspectrum(signal_data)
             amplitudebuffer = getparameter.getamplitude(signal_data)
             pca_result = extractfeatures.getfreqPCA(frequencyspectrum, amplitudebuffer)
-
-            plt.figure(figsize=(10, 5))
-            plt.plot(
-                range(1, 86),
-                pca_result.flatten(),
-                marker="o",
-                linestyle="-",
-                color="r",
-                alpha=0.7,
-            )
-            plt.xlabel("Frequency Bin Index")
-            plt.ylabel("PCA Component Value")
-            plt.title("PCA Across Frequency Bins (Transposed 1x85)")
-            plt.grid()
-            plt.show()
-            print("Final PCA Result Shape:", pca_result)
-
         return pca_result
 
 
 if __name__ == "__main__":
 
     FOLDER_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human4.txt"
-    # folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing10.txt'
+    #FOLDER_PATH = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing10.txt'
 
     CNNMODEL_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Model/pca_cnn_model.h5"
 
     Predict = Predict_FFT()
     PredictPCA = Predict.loadpredictfile(FOLDER_PATH)
+    
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, 86),PredictPCA.flatten(),marker="o",linestyle="-",color="r",alpha=0.7,)
+    plt.xlabel("Frequency Bin Index")
+    plt.ylabel("PCA Component Value")
+    plt.title("PCA Across Frequency Bins (Transposed 1x85)")
+    plt.grid()
+    plt.show()
+    print("Final PCA Result Shape:", PredictPCA)
 
     UpdatedPredictPCA = PredictPCA.reshape(PredictPCA.shape[0], -1)
 

@@ -42,15 +42,24 @@ class FftSignal:
             print(f"Error loading data: {e}")
             return None
         
-               
+    def plot_raw_data(self,frequencyspectrum,amplitudebuffer):
+        fig, ax = plt.subplots(figsize=(10, 6))
+        for i in range(amplitudebuffer.shape[0]):  # Iterate through rows in amplitude buffer
+            ax.plot(frequencyspectrum, amplitudebuffer.iloc[i, :], label=f'Time {i+1}')
+        ax.set_title("Frequency Spectrum vs Amplitude")
+        ax.set_xlabel("Frequency (Hz)")
+        ax.set_ylabel("Amplitude")
+        ax.grid()
+        
+        plt.show()
+            
     def save_signal_data(self, signal_data, output_file_path):
         try:
             signal_data.to_csv(output_file_path, index=False, header=False, sep='\t')
             print(f"Signal data saved successfully to {output_file_path}")
         except Exception as e:
             print(f"Error saving signal data: {e}")
-    
-        
+            
     def plot_data(self, X_axis, Y_axis):
         fig, axes = plt.subplots(4, 4, figsize=(15, 12))
         axes = axes.flatten() 
@@ -618,8 +627,8 @@ if __name__ == "__main__":
     #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
     #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_110_Wall.txt'
     
-    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human7.txt'
-    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing3.txt'
+    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human7.txt'
+    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing3.txt'
     
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_40_Wall.txt'
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_40_Hand.txt'
@@ -642,6 +651,12 @@ if __name__ == "__main__":
        SamplingFrequency   = getparameter.getSamplingFrequency()
        FrequencyFactor     = getparameter.getfreqfactor(SamplingFrequency)
        FrequencyResolution = getparameter.getFreqresolution(BW)
+       
+       signalentropy = extractfeatures.getentropy(amplitudebuffer)
+       window_size = extractfeatures.getwindowsize(signalentropy,FrequencyResolution)
+       smooothenedAmplitudebuffer = extractfeatures.smoothenAmplitude(amplitudebuffer,window_size)
+       
+       fft_signal.plot_raw_data(frequencyspectrum,amplitudebuffer)
            
        PCAResult = extractfeatures.getfreqPCA(frequencyspectrum,amplitudebuffer)
 
@@ -653,23 +668,6 @@ if __name__ == "__main__":
        plt.grid()
        plt.show()
        print("Final PCA Result Shape:", PCAResult)
-
-    #    # Plot Mean Amplitude
-    #    plt.figure(figsize=(10, 5))
-    #    plt.plot(frequencyspectrum, MeanAmplitude, marker='o', linestyle='-', color='b', label='Mean Amplitude')
-    #    # Labels and Title
-    #    plt.xlabel("Index")
-    #    plt.ylabel("Mean Amplitude")
-    #    plt.title("Mean Amplitude Over Samples")
-    #    plt.legend()
-    #    plt.grid(True)
-
-    #     # Show the Plot
-    #    plt.show()
-       
-    #    mean_amplitude_value = np.mean(MeanAmplitude)
-    #    print(mean_amplitude_value)
-
       
     #    amplitudebuffer_list = []
     #    amplitudebuffer_list.append(amplitudebuffer)
@@ -710,40 +708,6 @@ if __name__ == "__main__":
     #     "Spectral Entropy": entropy_values
     #     }
        
-    #    plt.figure(figsize=(15, 10))  # Set overall figure size
-       
-    #    for i, (feature_name, values) in enumerate(features.items()):
-    #        plt.subplot(2, 3, i + 1)  # 2 rows, 3 columns
-    #        plt.plot(x_axis, values, label=feature_name, color='b')
-    #        plt.xlabel("Row Index (Time Steps)")
-    #        plt.ylabel(feature_name)
-    #        plt.title(feature_name)
-    #        plt.grid(True)
-    #        plt.legend()
-
-    #    plt.tight_layout()  # Adjust layout for better spacing
-    #    plt.show()
-       
-       #peak_frequencies = fft_signal.calculate_F2(signal_data)
-       #print("Peak Frequencies:", peak_frequencies)
-
-       #F1 = fft_signal.calculate_F1(peak_frequencies)
-       #print(f"Calculated Feature 1 Mean(F1): {F1}")
-
-       #F3 = fft_signal.calculate_F3(peak_frequencies)
-       #print(f"Calculated Feature 3 Variance(F3): {F3}")
-
-       #F4 = fft_signal.calculate_F4(signal_data)
-       #print(f"Calculated Feature 4 Peaks(F4): {F4}")
-
-       #F5 = fft_signal.calculate_F5(signal_data)
-       #print(f"Calculated Feature 5 Mean(F5) based on F4: {F5}")
-
-       #F6 = fft_signal.calculate_F6(signal_data)
-       #print(f"Calculated Feature 6 Variance(F5) based on F4: {F6}")
-
-       #F7 = fft_signal.calculate_F7(signal_data)
-       #print(f"Calculated Feature 7 Mean Frequency(F7) around Max Peak: {F7}")
 
        
        

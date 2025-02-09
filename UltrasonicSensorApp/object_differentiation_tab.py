@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt
 import numpy as np
 
 from trainfftsignal import FFTModel
+from Predictfft import Predict_FFT
 import os
 
 import matplotlib.pyplot as plt
@@ -17,11 +18,17 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers, models
 
+from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PyQt5.QtGui import QPixmap
+
 signal_data = None
 file_path = None
 folder_path = None
 model = None
 history = None
+predictmodelpath = None
+predictfilepath = None
+Loadcnnmodel = None
 
 def object_differentiation_features(layout, output_box):
     
@@ -388,6 +395,10 @@ def object_differentiation_features(layout, output_box):
     def train_my_model():
         global folder_path, model , history
         
+        if folder_path is None:
+           output_box.append("No Folder or Files to Train...!!!")
+           return
+        
         ffttrain = FFTModel()
 
         ffttrain.load_fft_signals(folder_path)
@@ -536,3 +547,158 @@ def object_differentiation_features(layout, output_box):
         
     Train_button_layout.itemAt(2).widget().clicked.connect(train_my_model)
     Train_button_layout.itemAt(3).widget().clicked.connect(plot_model)
+    
+    save_model_button = QPushButton("Save Model")
+    save_model_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    save_model_button.setFixedWidth(200)
+    save_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    
+    Save_button_layout = QVBoxLayout()  # This layout will be placed below Train_button_layout
+    Save_button_layout.addWidget(save_model_button)
+    
+    layout.addLayout(Save_button_layout)
+    
+    def save_trained_model():
+        global model
+        if model is None:
+            output_box.append("Error: No trained model found. Train the model first.")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(None, "Save Model", "", "H5 Files (*.h5);;All Files (*)")
+        
+        if file_path:  # If user selects a file path
+            model.save(file_path)
+            output_box.append(f"Model saved successfully at: {file_path}")
+    
+    save_model_button.clicked.connect(save_trained_model)
+    
+    # Add a spacer or title block above the new buttons section
+    spacer = QSpacerItem(QSizePolicy.Minimum, QSizePolicy.Expanding)
+    layout.addItem(spacer)  # Adds vertical spac
+    
+    # Optional: Add a block of text above the new buttons
+    predictmodelspacer_title = QLabel("Predict Model")
+    predictmodelspacer_title.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    layout.addWidget(predictmodelspacer_title)
+    
+    Predict_button_layout = QHBoxLayout()
+    Predict_button_layout.setSpacing(10)  # Spacing between buttons
+    Predict_button_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+    Predict_button_layout.setAlignment(Qt.AlignLeft)
+    
+    # Add new buttons
+    select_predictmodel_button = QPushButton("  Select Model  ")
+    select_predictmodel_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    select_predictmodel_button.setFixedWidth(200)
+    Predict_button_layout.addWidget(select_predictmodel_button)
+
+    model_path_label = QLabel("No File selected")
+    model_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    model_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(model_path_label)
+    
+    # -------- Select File Button --------
+    select_predictfile_button = QPushButton("  Select File  ")
+    select_predictfile_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    select_predictfile_button.setFixedWidth(200)
+    Predict_button_layout.addWidget(select_predictfile_button)
+    
+    # File Path Label
+    predictfile_path_label = QLabel("No File Selected")
+    predictfile_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    predictfile_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(predictfile_path_label)
+    
+    predictselectedfile_button = QPushButton("Predict")
+    predictselectedfile_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    predictselectedfile_button.setFixedWidth(200)
+    predictselectedfile_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(predictselectedfile_button)
+    
+    # Function to open folder dialog and set path
+    def select_predictionmodel():
+        global predictmodelpath,Loadcnnmodel
+        Predict = Predict_FFT()
+        predictmodelpath, _ = QFileDialog.getOpenFileName(None, "Select Model", "", "H5 Files (*.h5);;All Files (*)")
+        if predictmodelpath:
+           Loadcnnmodel = Predict.loadCNNModel(predictmodelpath)
+           model_path_label.setText(os.path.basename(predictmodelpath))
+           output_box.append(f"Model selected: {predictmodelpath}")
+        else:
+           output_box.append("Invalid Model or File..!!")
+           
+    def select_predictfile():
+        global predictmodelpath,predictfilepath
+        predictfilepath, _ = QFileDialog.getOpenFileName(None, "Select File", "", "Txt Files (*.txt);;All Files (*)")
+        if predictfilepath:
+            predictfile_path_label.setText(os.path.basename(predictfilepath))
+            output_box.append(f"File selected: {predictfilepath}")
+        else:
+            output_box.append("Invalid File..!!")
+    
+    def show_prediction_dialog(message,Path):
+        global predictmodelpath,predictfilepath
+        dialog = QDialog()
+        dialog.setWindowTitle("Prediction Result")
+        dialog.setMinimumSize(400, 300)
+        
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        
+        LOGO_DIR = os.path.join(BASE_DIR, "Logo")
+        IMAGE_PATH = os.path.join(LOGO_DIR, Path)
+        print(IMAGE_PATH)
+
+        # Load and display image
+        image_label = QLabel()
+        pixmap = QPixmap(IMAGE_PATH)
+        pixmap = pixmap.scaled(250, 250)  # Resize if needed
+        image_label.setPixmap(pixmap)
+        image_label.setAlignment(Qt.AlignCenter)
+
+        # Display message
+        message_label = QLabel(message)
+        message_label.setAlignment(Qt.AlignCenter)
+        message_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px; text-align: center;")
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignCenter)
+        layout.addWidget(image_label)
+        layout.addWidget(message_label)
+        dialog.setLayout(layout)
+        predicted_labels = []  # Clear stored predictions
+        dialog.exec_()
+            
+    def predict_selectedfile():
+        global predictmodelpath,predictfilepath,Loadcnnmodel
+        
+        Predict = Predict_FFT()
+        PredictPCA = Predict.loadpredictfile(predictfilepath)
+
+        UpdatedPredictPCA = PredictPCA.reshape(PredictPCA.shape[0], -1)
+
+        predictions = Loadcnnmodel.predict(UpdatedPredictPCA)
+
+        predicted_labels = (predictions > 0.5).astype(int)
+        
+        for label in predicted_labels:
+            if label == 0:
+                result_message = "Wear Seat Belt...!!"
+                output_box.append("Wear Seat Belt...!!")
+                Image_Path = "Warning.png"
+            else:
+                result_message = "No Presence Detected.."
+                output_box.append(f"No Presence Detected..")
+                Image_Path = "No Warning.png"
+        show_prediction_dialog(result_message,Image_Path)
+        
+    # Connect the select folder button to the select folder function
+    select_predictmodel_button.clicked.connect(select_predictionmodel)
+    select_predictfile_button.clicked.connect(select_predictfile)
+    predictselectedfile_button.clicked.connect(predict_selectedfile)
+    
+    layout.addLayout(Predict_button_layout)
