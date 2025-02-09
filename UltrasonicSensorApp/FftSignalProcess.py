@@ -6,10 +6,10 @@ from scipy.signal import find_peaks
 from scipy.stats import skew, kurtosis
 from scipy.special import entr
 from scipy.stats import entropy
-
+from scipy import signal
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-
+from scipy.signal import get_window
 import matplotlib.pyplot as plt
 
 
@@ -374,6 +374,11 @@ class getFFTSignalParameters:
         amplitude_buffer = signal_data.iloc[1:, :] 
         return amplitude_buffer
     
+    def getabsamplitude(self, signal_data):
+        amplitude_buffer = signal_data.iloc[1:, :]
+        magnitude_buffer = amplitude_buffer.abs()
+        return magnitude_buffer
+    
     def getFmax(self,frequencyspectrum):      
         fmax = frequencyspectrum.max()
         return fmax
@@ -401,6 +406,56 @@ class getFFTSignalParameters:
         window_width = 8192  # FFT points (window width)
         freq_resolution = BW / window_width
         return freq_resolution
+    
+    def getBandPassFilterParameters(self,frequencyspectrum,MaxAmplitude,Totalpower):
+        getsealed = getFFTSignalParameters()
+        max_amplitude_value = np.max(MaxAmplitude)
+        max_amplitude_indices = np.where(MaxAmplitude == max_amplitude_value)[0]
+       
+        # Find all indices where Totalpower reaches its maximum
+        max_power_value = np.max(Totalpower)
+        max_power_indices = np.where(Totalpower == max_power_value)[0]
+        
+        # Extract corresponding frequencies
+        freq_amplitude_peaks = frequencyspectrum[max_amplitude_indices]
+        freq_power_peaks = frequencyspectrum[max_power_indices]
+        
+        # Compute weighted center frequency (weighted by amplitudes and power at each peak)
+        weighted_freq_amplitude = np.sum(freq_amplitude_peaks * MaxAmplitude[max_amplitude_indices]) / np.sum(MaxAmplitude[max_amplitude_indices])
+        weighted_freq_power = np.sum(freq_power_peaks * Totalpower[max_power_indices]) / np.sum(Totalpower[max_power_indices])
+        
+        # Final center frequency: averaging both weighted results
+        center_frequency_combined = (weighted_freq_amplitude + weighted_freq_power) / 2
+        
+        # Calculate -3 dB threshold (50% of max power)
+        threshold = 0.5 * max_power_value
+
+        # Find indices where power crosses the threshold
+        indices_below_threshold = np.where(Totalpower >= threshold)[0]
+
+        if len(indices_below_threshold) > 0:
+            # Get the first and last frequency that meets the -3 dB criteria
+            F1_3dB = frequencyspectrum[indices_below_threshold[0]]  # Lower cutoff
+            F2_3dB = frequencyspectrum[indices_below_threshold[-1]]  # Upper cutoff
+        else:
+            # If no cutoff frequencies are found, set default values
+            F1_3dB = None
+            F2_3dB = None
+            print("Warning: No cutoff frequencies found at -3 dB level.")
+        alpha = 0.5  # Adjust this value as needed (e.g., between 0.1 and 0.3)
+        F1 = F1_3dB - alpha * (F2_3dB - F1_3dB)
+        F2 = F2_3dB + alpha * (F2_3dB - F1_3dB)
+        
+        F1_sealed = frequencyspectrum[np.abs(frequencyspectrum - F1).argmin()]
+        F2_sealed = frequencyspectrum[np.abs(frequencyspectrum - F2).argmin()]
+        center_frequency_sealed = frequencyspectrum[np.abs(frequencyspectrum - center_frequency_combined).argmin()]
+        
+        return center_frequency_sealed,F1_sealed,F2_sealed
+
+    def seal_to_spectrum(self,value, frequencyspectrum):
+        # Find the index of the closest frequency value in frequencyspectrum
+        index = np.abs(frequencyspectrum - value).argmin()
+        return frequencyspectrum[index]
         
 class getFFTSignalFreqDomainFeatures:
     def __init__(self):
@@ -476,7 +531,7 @@ class getFFTSignalFreqDomainFeatures:
         power = np.sum(amplitudebuffer**2, axis=0)
         self.features['power'] = power
         return power
-
+    
     def getcrestfactor(self,amplitudebuffer):
         peak_amplitude = np.max(amplitudebuffer, axis=0)  # Maximum value (Peak)
         rms_amplitude = np.sqrt(np.mean(amplitudebuffer**2, axis=0))  # RMS value
@@ -509,6 +564,31 @@ class getFFTSignalFreqDomainFeatures:
         relative_spectral_peak = (np.max(amplitudebuffer, axis=0)) / np.sum(amplitudebuffer, axis=0)
         self.features['relative_spectr8al_peak'] = relative_spectral_peak
         return relative_spectral_peak
+    
+    def applyHanningWindow(self, frequencyspectrum, amplitude_buffer,F1,F2):
+        freq_range = np.array(frequencyspectrum)
+        f1_index = np.searchsorted(freq_range, F1)
+        f2_index = np.searchsorted(freq_range, F2)
+        # Generate Hanning window for the passband
+        window = np.zeros_like(freq_range, dtype=float)
+        window[f1_index:f2_index + 1] = np.hanning(f2_index - f1_index + 1)
+        
+        amplitudebuffer_float = amplitude_buffer.astype(float)
+        # Apply the Hanning window to the FFT data (amplitudebuffer)
+        windowed_amplitudebuffer = amplitudebuffer_float.copy() 
+        
+        # Apply the window to each sample (row) of the amplitudebuffer
+        for i in range(windowed_amplitudebuffer.shape[0]):  # Iterate over each row (sample)
+           windowed_amplitudebuffer.iloc[i, :] *= window  # Apply the window across all frequency bins
+           
+        # Define the window function (you can try 'hamming', 'hann', 'blackmanharris', etc.)
+        window_type = 'hann'  # Or 'hamming', 'blackmanharris', etc.
+        window = get_window(window_type, amplitude_buffer.shape[1])
+
+        # Apply the window to the amplitudebuffer and windowed_amplitudebuffer
+        smoothed_windowed_amplitudebuffer = windowed_amplitudebuffer.multiply(window, axis=1)
+        
+        return smoothed_windowed_amplitudebuffer 
     
     def getfreqPCA(self,frequencyspectrum,amplitudebuffer):
         extract = getFFTSignalFreqDomainFeatures()
@@ -565,6 +645,7 @@ class getFFTSignalFreqDomainFeatures:
                             "Margin", 
                             "RelativePeakSpectral"
                         ]
+        features_df = features_df.dropna() 
         # Step 1: Standardize the data (PCA works better on standardized data)
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(features_df.T)
@@ -627,8 +708,8 @@ if __name__ == "__main__":
     #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
     #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_110_Wall.txt'
     
-    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human7.txt'
-    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing3.txt'
+    #folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Soft/fft_Human7.txt'
+    folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/fft_data/New Readings/Hard/fft_Nothing5.txt'
     
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Hard/fft_40_Wall.txt'
     #folder_path = 'E:/Frankfurt University of Applied Sciences/Master Thesis/GitHub/Coding/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_40_Hand.txt'
@@ -645,6 +726,7 @@ if __name__ == "__main__":
        # #
        frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
        amplitudebuffer     = getparameter.getamplitude(signal_data)
+       absamplitudebuffer     = getparameter.getabsamplitude(signal_data)
        Fmax                = getparameter.getFmax(frequencyspectrum)
        Fmin                = getparameter.getFmin(frequencyspectrum)
        BW                  = getparameter.getBW(Fmax,Fmin)
@@ -652,13 +734,105 @@ if __name__ == "__main__":
        FrequencyFactor     = getparameter.getfreqfactor(SamplingFrequency)
        FrequencyResolution = getparameter.getFreqresolution(BW)
        
-       signalentropy = extractfeatures.getentropy(amplitudebuffer)
-       window_size = extractfeatures.getwindowsize(signalentropy,FrequencyResolution)
-       smooothenedAmplitudebuffer = extractfeatures.smoothenAmplitude(amplitudebuffer,window_size)
+       #fft_signal.plot_raw_data(frequencyspectrum,amplitudebuffer)
+       MaxAmplitude    = extractfeatures.getMaxAmplitude(absamplitudebuffer)
+       Totalpower      = extractfeatures.gettotalpower(absamplitudebuffer)
        
-       fft_signal.plot_raw_data(frequencyspectrum,amplitudebuffer)
+       center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+       
+       smoothed_windowed_amplitudebuffer = extractfeatures.applyHanningWindow(frequencyspectrum,absamplitudebuffer,F1,F2)
+       
+       plt.figure(figsize=(12, 6))
+
+       # Plot original data (without window)
+       plt.subplot(1, 2, 1)
+       plt.imshow(absamplitudebuffer, aspect='auto', cmap='viridis', origin='lower')
+       plt.colorbar(label="Amplitude")
+       plt.title("Original FFT Data (Amplitude)")
+       plt.xlabel("Frequency Bin")
+       plt.ylabel("Sample Index")
+
+       # Plot windowed data (with window)
+       plt.subplot(1, 2, 2)
+       plt.imshow(smoothed_windowed_amplitudebuffer, aspect='auto', cmap='viridis', origin='lower')
+       plt.colorbar(label="Amplitude")
+       plt.title("Windowed FFT Data (After Band-Pass Filter)")
+       plt.xlabel("Frequency Bin")
+       plt.ylabel("Sample Index")
+       plt.tight_layout()
+       plt.show()
+    
+       fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))  # Create two subplots
+
+       # Plot for original amplitudebuffer
+       for i in range(absamplitudebuffer.shape[0]):  # Loop through each signal row
+           ax1.plot(frequencyspectrum, absamplitudebuffer.iloc[i, :], alpha=0.7)
            
-       PCAResult = extractfeatures.getfreqPCA(frequencyspectrum,amplitudebuffer)
+       ax1.set_xlabel('Frequency (Hz)')
+       ax1.set_ylabel('Amplitude')
+       ax1.set_title('Original Frequency Spectrum vs Amplitude Buffer')
+       ax1.grid(True)
+       ax1.axvline(center_frequency, color='g', linestyle='--', label=f'Center Freq: {center_frequency:.2f} Hz')
+       ax1.axvline(F1, color='r', linestyle='--', label=f'Lower Cutoff: {F1:.2f} Hz')
+       ax1.axvline(F2, color='r', linestyle='--', label=f'Upper Cutoff: {F2:.2f} Hz')
+       ax1.legend()
+
+        # Plot for windowed_amplitudebuffer
+       for i in range(smoothed_windowed_amplitudebuffer.shape[0]):  # Loop through each signal row
+           ax2.plot(frequencyspectrum, smoothed_windowed_amplitudebuffer.iloc[i, :],alpha=0.7)
+
+       ax2.set_xlabel('Frequency (Hz)')
+       ax2.set_ylabel('Amplitude')
+       ax2.set_title('Windowed Frequency Spectrum vs Amplitude Buffer')
+       ax2.grid(True)
+       ax2.axvline(center_frequency, color='g', linestyle='--', label=f'Center Freq: {center_frequency:.2f} Hz')
+       ax2.axvline(F1, color='r', linestyle='--', label=f'Lower Cutoff: {F1:.2f} Hz')
+       ax2.axvline(F2, color='r', linestyle='--', label=f'Upper Cutoff: {F2:.2f} Hz')
+       ax2.legend()
+
+       plt.tight_layout()  # Adjust spacing to prevent overlap
+       plt.show()    
+    
+       fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 18))
+       # 1st Subplot: Frequency Spectrum vs Max Amplitude
+       ax1.plot(frequencyspectrum, MaxAmplitude, marker='o', linestyle='-', color='b')
+       ax1.set_title('Frequency Spectrum vs Max Amplitude')
+       ax1.set_xlabel('Frequency (Hz)')
+       ax1.set_ylabel('Max Amplitude')
+       ax1.grid(True)
+       ax1.axvline(center_frequency, color='g', linestyle='--', label=f'Center Freq: {center_frequency:.2f} Hz')
+       ax1.axvline(F1, color='r', linestyle='--', label=f'Lower Cutoff: {F1:.2f} Hz')
+       ax1.axvline(F2, color='r', linestyle='--', label=f'Upper Cutoff: {F2:.2f} Hz')
+       ax1.legend()
+       
+       # 2nd Subplot: Frequency Spectrum vs Total Power
+       ax2.plot(frequencyspectrum, Totalpower, label="Total Power vs Frequency Spectrum", color='r')
+       ax2.set_title('Frequency Spectrum vs Total Power')
+       ax2.set_xlabel('Frequency Spectrum (Hz)')
+       ax2.set_ylabel('Total Power')
+       ax2.grid(True)
+       ax2.axvline(center_frequency, color='g', linestyle='--', label=f'Center Freq: {center_frequency:.2f} Hz')
+       ax2.axvline(F1, color='r', linestyle='--', label=f'Lower Cutoff: {F1:.2f} Hz')
+       ax2.axvline(F2, color='r', linestyle='--', label=f'Upper Cutoff: {F2:.2f} Hz')
+       ax2.legend()
+     
+       # 3rd Subplot: Frequency Spectrum vs Amplitude Buffer
+       for i in range(absamplitudebuffer.shape[0]):  # Loop through each signal row
+           ax3.plot(frequencyspectrum, absamplitudebuffer.iloc[i, :])
+       ax3.set_xlabel('Frequency (Hz)')
+       ax3.set_ylabel('Amplitude')
+       ax3.set_title('Frequency Spectrum vs Amplitude Buffer')
+       ax3.grid(True)
+       ax3.axvline(center_frequency, color='g', linestyle='--', label=f'Center Freq: {center_frequency:.2f} Hz')
+       ax3.axvline(F1, color='r', linestyle='--', label=f'Lower Cutoff: {F1:.2f} Hz')
+       ax3.axvline(F2, color='r', linestyle='--', label=f'Upper Cutoff: {F2:.2f} Hz')
+       ax3.legend()
+      
+       plt.tight_layout()
+       plt.show()
+      
+       
+       PCAResult = extractfeatures.getfreqPCA(frequencyspectrum,smoothed_windowed_amplitudebuffer)
 
        plt.figure(figsize=(10, 5))
        plt.plot(range(1, 86), PCAResult.flatten(), marker='o', linestyle='-', color='r', alpha=0.7)

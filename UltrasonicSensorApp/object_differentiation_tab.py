@@ -128,7 +128,11 @@ def object_differentiation_features(layout, output_box):
            output_box.append("No signal data loaded.")
            return
         frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
-        amplitudebuffer     = getparameter.getamplitude(signal_data)
+        amplitudebuffer     = getparameter.getabsamplitude(signal_data)
+        MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
+        Totalpower      = extract.gettotalpower(amplitudebuffer)
+        center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+        amplitudebuffer = extract.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
         try:
              fig, ax = plt.subplots(figsize=(10, 6))
              for i in range(amplitudebuffer.shape[0]):  # Iterate through rows in amplitude buffer
@@ -157,13 +161,19 @@ def object_differentiation_features(layout, output_box):
            return
         
         frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
-        amplitudebuffer     = getparameter.getamplitude(signal_data)
+        amplitudebuffer     = getparameter.getabsamplitude(signal_data)
         Fmax                = getparameter.getFmax(frequencyspectrum)
         Fmin                = getparameter.getFmin(frequencyspectrum)
         BW                  = getparameter.getBW(Fmax,Fmin)
         SamplingFrequency   = getparameter.getSamplingFrequency()
         FrequencyFactor     = getparameter.getfreqfactor(SamplingFrequency)
         FrequencyResolution = getparameter.getFreqresolution(BW)
+        
+        MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
+        Totalpower      = extract.gettotalpower(amplitudebuffer)
+       
+        center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+        
         
         characteristics_dialog = QDialog()
         characteristics_dialog.setWindowTitle("Signal Characteristics")
@@ -178,6 +188,9 @@ def object_differentiation_features(layout, output_box):
         dialog_layout.addWidget(QLabel(f"Sampling Frequency: {SamplingFrequency} Hz"))
         dialog_layout.addWidget(QLabel(f"Frequency Factor: {FrequencyFactor}"))
         dialog_layout.addWidget(QLabel(f"Frequency Resolution: {FrequencyResolution} Hz"))
+        dialog_layout.addWidget(QLabel(f"Centre Frequency: {center_frequency} Hz"))
+        dialog_layout.addWidget(QLabel(f"Lower Cut-off Frequency: {F1} Hz"))
+        dialog_layout.addWidget(QLabel(f"Upper Cut-off Frequency: {F2} Hz"))
         
         close_button = QPushButton("Close")
         close_button.setStyleSheet("font-size: 16px; padding: 5px;")
@@ -195,7 +208,13 @@ def object_differentiation_features(layout, output_box):
            output_box.append("No signal data loaded.")
            return
         frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
-        amplitudebuffer     = getparameter.getamplitude(signal_data)
+        amplitudebuffer     = getparameter.getabsamplitude(signal_data)
+        
+        MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
+        Totalpower      = extract.gettotalpower(amplitudebuffer)
+        center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+        amplitudebuffer = extract.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+        
         MeanAmplitude   = extract.getMeanAmplitude(amplitudebuffer)
         MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
         PeaktoPeak      = extract.getPeakToPeak(amplitudebuffer)
@@ -279,7 +298,13 @@ def object_differentiation_features(layout, output_box):
            return
         
         frequencyspectrum   = getparameter.getfrequencyspectrum(signal_data)
-        amplitudebuffer     = getparameter.getamplitude(signal_data)
+        amplitudebuffer     = getparameter.getabsamplitude(signal_data)
+        
+        MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
+        Totalpower      = extract.gettotalpower(amplitudebuffer)
+        center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+        amplitudebuffer = extract.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+        
         PCAResult = extract.getfreqPCA(frequencyspectrum,amplitudebuffer)
 
         # Plotting the PCA result

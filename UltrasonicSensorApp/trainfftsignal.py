@@ -43,13 +43,25 @@ class FFTModel:
         soft_pca_results = []
         for signal in hard_signals:
             frequencyspectrum = getparameter.getfrequencyspectrum(signal)
-            amplitudebuffer = getparameter.getamplitude(signal)
+            amplitudebuffer = getparameter.getabsamplitude(signal)
+            
+            MaxAmplitude    = extractfeatures.getMaxAmplitude(amplitudebuffer)
+            Totalpower      = extractfeatures.gettotalpower(amplitudebuffer)
+            center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+            amplitudebuffer = extractfeatures.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+            
             pca_result = extractfeatures.getfreqPCA(frequencyspectrum, amplitudebuffer)
             hard_pca_results.append(pca_result)
 
         for signal in soft_signals:
             frequencyspectrum = getparameter.getfrequencyspectrum(signal)
-            amplitudebuffer = getparameter.getamplitude(signal)
+            amplitudebuffer = getparameter.getabsamplitude(signal)
+            
+            MaxAmplitude    = extractfeatures.getMaxAmplitude(amplitudebuffer)
+            Totalpower      = extractfeatures.gettotalpower(amplitudebuffer)
+            center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+            amplitudebuffer = extractfeatures.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+            
             pca_result = extractfeatures.getfreqPCA(frequencyspectrum, amplitudebuffer)
             soft_pca_results.append(pca_result)
 

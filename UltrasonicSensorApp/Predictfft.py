@@ -26,7 +26,13 @@ class Predict_FFT:
             signal_data = fft_signal.get_fft_data(file)
 
             frequencyspectrum = getparameter.getfrequencyspectrum(signal_data)
-            amplitudebuffer = getparameter.getamplitude(signal_data)
+            amplitudebuffer = getparameter.getabsamplitude(signal_data)
+            
+            MaxAmplitude    = extractfeatures.getMaxAmplitude(amplitudebuffer)
+            Totalpower      = extractfeatures.gettotalpower(amplitudebuffer)
+            center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
+            amplitudebuffer = extractfeatures.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+            
             pca_result = extractfeatures.getfreqPCA(frequencyspectrum, amplitudebuffer)
         return pca_result
 
