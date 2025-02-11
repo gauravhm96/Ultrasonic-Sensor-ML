@@ -93,7 +93,7 @@ def object_differentiation_features(layout, output_box):
     button_layout.setAlignment(Qt.AlignLeft)
     
     # Add the required buttons
-    buttons = ["Save Data", "Plot Raw Data", "Signal Characetristics", "Feature Extract(Freq)","Generate PCA"]
+    buttons = ["Save Data", "Show Heat Map", "Signal Characetristics", "Feature Extract(Freq)","Generate PCA"]
     for button_name in buttons:
         button = QPushButton(button_name)
         button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
@@ -132,20 +132,28 @@ def object_differentiation_features(layout, output_box):
         MaxAmplitude    = extract.getMaxAmplitude(amplitudebuffer)
         Totalpower      = extract.gettotalpower(amplitudebuffer)
         center_frequency,F1,F2 = getparameter.getBandPassFilterParameters(frequencyspectrum,MaxAmplitude,Totalpower)
-        amplitudebuffer = extract.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
+        windowed_amplitudebuffer  = extract.applyHanningWindow(frequencyspectrum,amplitudebuffer,F1,F2)
         try:
-             fig, ax = plt.subplots(figsize=(10, 6))
-             for i in range(amplitudebuffer.shape[0]):  # Iterate through rows in amplitude buffer
-                 ax.plot(frequencyspectrum, amplitudebuffer.iloc[i, :], label=f'Time {i+1}')
-             ax.set_title("Frequency Spectrum vs Amplitude")
-             ax.set_xlabel("Frequency (Hz)")
-             ax.set_ylabel("Amplitude")
+             fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+             im1 = axes[0].imshow(amplitudebuffer, aspect='auto', cmap='viridis', origin='lower')
+             axes[0].set_title("Original FFT Amplitude")
+             axes[0].set_xlabel("Frequency Bin")
+             axes[0].set_ylabel("Sample Index")
+             fig.colorbar(im1, ax=axes[0], label="Amplitude")
+             
+             # Heatmap of windowed (filtered) FFT amplitude data
+             im2 = axes[1].imshow(windowed_amplitudebuffer, aspect='auto', cmap='viridis', origin='lower')
+             axes[1].set_title("Windowed FFT Amplitude")
+             axes[1].set_xlabel("Frequency Bin")
+             axes[1].set_ylabel("Sample Index")
+             fig.colorbar(im2, ax=axes[1], label="Amplitude")
+             
+             plt.tight_layout()
              
              canvas = FigureCanvas(fig)
              toolbar = NavigationToolbar2QT(canvas)
              plot_dialog = QDialog()
-             plot_dialog.setWindowTitle("Plot Data")
-             
+             plot_dialog.setWindowTitle("Heat Map")
              dialog_layout = QVBoxLayout(plot_dialog)
              dialog_layout.addWidget(toolbar)
              dialog_layout.addWidget(canvas)

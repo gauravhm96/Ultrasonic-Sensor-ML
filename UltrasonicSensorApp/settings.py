@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
 from distanceML import distanceMLFeatureExtract
 from general_tab import add_general_features
 from object_differentiation_tab import object_differentiation_features
+from object_detection_tab import object_detection_features
 
 
 class SettingsWindow(QMainWindow):
@@ -61,6 +62,7 @@ class SettingsWindow(QMainWindow):
         tab_widget.addTab(self.ML_tab(), "ML Tab")
         tab_widget.addTab(self.advanced_tab(), "Advanced")
         tab_widget.addTab(self.Object_Differentiation(), "Object Differentiation")
+        tab_widget.addTab(self.Object_Detection(), "Object Detection")
         tab_widget.addTab(self.about_tab(), "About")
 
         # Add OK, Cancel, and Exit buttons at the bottom
@@ -175,6 +177,21 @@ class SettingsWindow(QMainWindow):
         layout.addWidget(label)
         
         object_differentiation_features(layout, self.output_box)
+        
+        layout.addStretch()  # Push contents to the top
+        tab.setLayout(layout)
+        return tab
+    
+    def Object_Detection(self):
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        label = QLabel("Object Detection")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+
+        layout.addWidget(label)
+        
+        object_detection_features(layout, self.output_box)
         
         layout.addStretch()  # Push contents to the top
         tab.setLayout(layout)
