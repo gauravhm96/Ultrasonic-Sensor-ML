@@ -67,24 +67,23 @@ class Plot_signals:
         except Exception as e:
             print(f"An error occurred while plotting the data: {e}")
             
-    def plot_peaks_on_signal(self,dataframe, peaks_indices):
-        num_signals = dataframe.shape[0]
+    def plot_signal_with_peaks(self,dataframe, peak_index, peak_value):
+        plt.figure(figsize=(15, 8))
+        for index, row in dataframe.iterrows():
+            plt.plot(row, color='lightgray', linewidth=0.5, alpha=0.7)  # Plotting each signal
 
-        for i in range(num_signals):
-            signal = dataframe.iloc[i, :].to_numpy()
-            peaks = peaks_indices[i]
+        # Highlight the most prominent peak on all signals using lines
+        plt.axvline(x=peak_index, color='red', linestyle='--', label='Peak Index')
+        plt.axhline(y=peak_value, color='blue', linestyle='--', label='Peak Amplitude')
 
-            plt.figure(figsize=(10, 6))
-            plt.plot(signal, label=f'Signal {i+1}')
-            plt.scatter(peaks, signal[peaks], color='red', label='Detected Peaks')
-            plt.title(f'Signal {i+1} with Detected Peaks')
-            plt.xlabel('Sample Index')
-            plt.ylabel('Amplitude')
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
-            
+        plt.title('All Filtered ADC Signals with Highlighted Peak')
+        plt.xlabel('Sample Index')
+        plt.ylabel('Amplitude')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+        
 class ADCSignalProcess:
     def __init__(self):
         pass
@@ -118,28 +117,51 @@ class ADCSignalProcess:
         filtered_data = sosfiltfilt(sos, data, axis=-1)
         return filtered_data
     
-    def detect_prominent_peaks(self,dataframe, std_multiplier=3):
+    def detect_prominent_peaks(self,dataframe,std_multiplier=3):
+        max_signal = dataframe.max(axis=0).to_numpy()
+        
+        # Set prominence threshold dynamically
+        prominence_threshold = np.mean(max_signal) + std_multiplier * (np.std(max_signal))
 
-        data_array = dataframe.to_numpy()
-        absolute_signal = np.abs(data_array)
-        mean_signal = np.mean(absolute_signal, axis=0)
-        std_signal = np.std(absolute_signal, axis=0)
-        
-        prominence_threshold = mean_signal + std_multiplier * std_signal
-        
-        peaks_indices = []
+        # Find peaks in the mean signal with the specified prominence
+        peaks, properties = find_peaks(max_signal, prominence=prominence_threshold)
 
-        for col_idx in range(data_array.shape[1]):
-            # Find peaks in the current column with the specified prominence
-            peaks, _ = find_peaks(absolute_signal[:, col_idx], prominence=prominence_threshold[col_idx])
-            peaks_indices.append(peaks)
-        
-        return peaks_indices
+        if len(peaks) > 0:
+           prominent_peak_index = peaks[0]  # Take the first prominent peak
+           prominent_peak_value = max_signal[prominent_peak_index]
+           return prominent_peak_index, prominent_peak_value
+        return None, None
+    
+    def calculate_distance_from_peak(self,highest_peak_index):
+        ADC_MAX_SAMPLE_FREQUENCY = 125000000  # Hz
+        # # Convert TOF to distance
+        SPEED_OF_SOUND = 343  # Speed of sound in meters per second
+        MICROSECONDS_TO_SECONDS = 1e-6  # Conversion factor from microseconds to seconds
+
+        # Convert peak index to time of flight in microseconds
+        time_of_flight_us = highest_peak_index * (1 / ADC_MAX_SAMPLE_FREQUENCY) * 1e6
+
+        # Convert time of flight to seconds
+        time_of_flight_seconds = time_of_flight_us * MICROSECONDS_TO_SECONDS
+
+        # Calculate distance in meters
+        distance_meters = (time_of_flight_seconds * SPEED_OF_SOUND) / 2
+
+        # Convert distance to centimeters
+        distance_cm = distance_meters * 100
+
+        return distance_cm
+    
+class TrainADC:
+    def __init__(self):
+        pass
+    
+    
     
 if __name__ == "__main__":
     # folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
 
-    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_70.txt"
+    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_67.txt"
     OUTPUT_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Test/adc_120.txt"
 
     myadcdata = ADCSignal()
@@ -147,20 +169,20 @@ if __name__ == "__main__":
     myplot = Plot_signals()
 
     my_adc_data = myadcdata.get_adc_data(FILE_PATH)
+    myplot.plot_adc_data(my_adc_data)
 
-    lowcut = 39000.0  # Lower cutoff frequency in Hz
+    adc_data_array = my_adc_data.to_numpy()
+    lowcut = 39500.0  # Lower cutoff frequency in Hz
     highcut = 41500.0  # Upper cutoff frequency in Hz
     fs = 1.953125e6    # Sampling frequency in Hz (as per your ADC configuration)
     
     sos = processadcdata.butter_bandpass(lowcut,highcut,fs)
-    
-    
-    adc_data_array = my_adc_data.to_numpy()
-    
     filtered_data_array = np.apply_along_axis(processadcdata.apply_bandpass_filter, 1, adc_data_array, sos)
     filtered_myadc_data = pd.DataFrame(filtered_data_array)
-    print(filtered_myadc_data.shape)
+    #myplot.plot_adc_data(filtered_myadc_data)
     
-    peaks = processadcdata.detect_prominent_peaks(filtered_myadc_data, std_multiplier=3)
-    print(len(peaks))
-    myplot.plot_peaks_on_signal(filtered_myadc_data,peaks)
+    peak_index, peak_value = processadcdata.detect_prominent_peaks(filtered_myadc_data)
+    print(processadcdata.calculate_distance_from_peak(peak_index))
+    myplot.plot_signal_with_peaks(filtered_myadc_data,peak_index, peak_value)
+
+    
