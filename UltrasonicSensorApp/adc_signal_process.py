@@ -96,7 +96,7 @@ class ADCSignalProcess:
         pass
 
     def performfft(self, data, samplingfreq):
-        dt = 1 / fs
+        dt = 1 / samplingfreq
         data = data.to_numpy()
         N = data.shape[1]
 
@@ -129,34 +129,36 @@ class ADCSignalProcess:
         else:
             print("No frequency components exceed the threshold.")
 
-        plt.figure(figsize=(12, 6))
-        plt.plot(freqs, avg_fft_magnitude, label="Avg FFT Magnitude", color="blue")
-        plt.axhline(
-            y=dynamic_threshold,
-            color="green",
-            linestyle="--",
-            label=f"Threshold ({dynamic_threshold*100:.0f}% of max)",
-        )
-        plt.axvline(
-            x=f_start,
-            color="red",
-            linestyle="--",
-            label=f"Start Frequency: {f_start:.0f} Hz",
-        )
-        plt.axvline(
-            x=f_end,
-            color="magenta",
-            linestyle="--",
-            label=f"End Frequency: {f_end:.0f} Hz",
-        )
-        plt.xlim(30000, 50000)
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Magnitude")
-        plt.title("Averaged FFT Magnitude with Detected Signal Band")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
+        # plt.figure(figsize=(12, 6))
+        # plt.plot(freqs, avg_fft_magnitude, label="Avg FFT Magnitude", color="blue")
+        # plt.axhline(
+        #     y=dynamic_threshold,
+        #     color="green",
+        #     linestyle="--",
+        #     label=f"Threshold ({dynamic_threshold*100:.0f}% of max)",
+        # )
+        # plt.axvline(
+        #     x=f_start,
+        #     color="red",
+        #     linestyle="--",
+        #     label=f"Start Frequency: {f_start:.0f} Hz",
+        # )
+        # plt.axvline(
+        #     x=f_end,
+        #     color="magenta",
+        #     linestyle="--",
+        #     label=f"End Frequency: {f_end:.0f} Hz",
+        # )
+        # plt.xlim(30000, 50000)
+        # plt.xlabel("Frequency (Hz)")
+        # plt.ylabel("Magnitude")
+        # plt.title("Averaged FFT Magnitude with Detected Signal Band")
+        # plt.legend()
+        # plt.grid(True)
+        # plt.tight_layout()
+        # plt.show()
+        
+        return freqs,avg_fft_magnitude,dynamic_threshold,f_start,f_end
 
     # Designs a Butterworth band-pass filter.
     # Parameters:
@@ -312,7 +314,7 @@ class TrainADC:
 
     #     joblib.dump(model, FILE_PATH)
     
-    def peaks_model(self, df_features, FILE_PATH):
+    def peaks_model(self, df_features):
         feature_columns = ['candidate_peak_index', 'amplitude', 'prominence', 'distance']
         X = df_features[feature_columns]
         y = df_features["label"]
@@ -338,8 +340,6 @@ class TrainADC:
         # Print the cross-validation scores and the mean accuracy
         print("Cross-Validation Accuracy Scores:", cv_scores)
         print("Mean CV Accuracy:", np.mean(cv_scores))
-
-        joblib.dump(model, FILE_PATH)
         return model
     
 
@@ -394,7 +394,7 @@ class PredictADC:
 if __name__ == "__main__":
     # folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
 
-    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_48.txt"
+    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_100.txt"
     FOLDER_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/"
     
     OUTPUT_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Test/adc_120.txt"
@@ -459,65 +459,67 @@ if __name__ == "__main__":
 
 
     
-    # adc_data_list = []
+    adc_data_list = []
     
-    # # Iterate over all files in the folder, label index starts from 1
-    # for idx, filename in enumerate(os.listdir(FOLDER_PATH), start=1):
-    #     # Optionally, only process .txt files (adjust extension if needed)
-    #     if filename.endswith('.txt'):
-    #         FILE_PATH = os.path.join(FOLDER_PATH, filename)
-    #         # Read ADC data from file using your get_adc_data function
-    #         my_adc_data = myadcdata.get_adc_data(FILE_PATH)
-    #         # Append a tuple containing the label (index) and the ADC data
-    #         adc_data_list.append((idx, my_adc_data))
+    # Iterate over all files in the folder, label index starts from 1
+    for idx, filename in enumerate(os.listdir(FOLDER_PATH), start=1):
+        # Optionally, only process .txt files (adjust extension if needed)
+        if filename.endswith('.txt'):
+            FILE_PATH = os.path.join(FOLDER_PATH, filename)
+            # Read ADC data from file using your get_adc_data function
+            my_adc_data = myadcdata.get_adc_data(FILE_PATH)
+            # Append a tuple containing the label (index) and the ADC data
+            adc_data_list.append((idx, my_adc_data))
 
-    # filtered_data_list = []
+    filtered_data_list = []
     
-    # for label, my_adc_data in adc_data_list:
-    #     # Convert the DataFrame to a NumPy array
-    #     adc_data_array = my_adc_data.to_numpy()
+    for label, my_adc_data in adc_data_list:
+        # Convert the DataFrame to a NumPy array
+        adc_data_array = my_adc_data.to_numpy()
         
-    #     # Apply the bandpass filter to each row of the ADC data array
-    #     filtered_data_array = np.apply_along_axis(processadcdata.apply_bandpass_filter, 1, adc_data_array, sos)
+        # Apply the bandpass filter to each row of the ADC data array
+        filtered_data_array = np.apply_along_axis(processadcdata.apply_bandpass_filter, 1, adc_data_array, sos)
         
-    #     # Convert the filtered data back to a DataFrame
-    #     filtered_myadc_data = pd.DataFrame(filtered_data_array)
+        # Convert the filtered data back to a DataFrame
+        filtered_myadc_data = pd.DataFrame(filtered_data_array)
         
-    #     # Append the tuple (label, filtered ADC data) to the list
-    #     filtered_data_list.append((label, filtered_myadc_data))
+        # Append the tuple (label, filtered ADC data) to the list
+        filtered_data_list.append((label, filtered_myadc_data))
         
-    # peak_features = train.process_adc_data_dataframe(filtered_myadc_data)
-    # df_features = train.consolidate_peak_features(peak_features)
+    peak_features = train.process_adc_data_dataframe(filtered_myadc_data)
+    df_features = train.consolidate_peak_features(peak_features)
     
-    # distance_to_features = {}
+    distance_to_features = {}
     
-    # for file_label, filtered_df in filtered_data_list:
-    #     # Step 1: Process the filtered ADC DataFrame to extract candidate peak features.
-    #     peak_features = train.process_adc_data_dataframe(filtered_df)
+    for file_label, filtered_df in filtered_data_list:
+        # Step 1: Process the filtered ADC DataFrame to extract candidate peak features.
+        peak_features = train.process_adc_data_dataframe(filtered_df)
         
-    #     # Step 2: Consolidate these features into a DataFrame.
-    #     df_features = train.consolidate_peak_features(peak_features)
+        # Step 2: Consolidate these features into a DataFrame.
+        df_features = train.consolidate_peak_features(peak_features)
         
-    #     # Step 3: Detect the prominent peak from the filtered data.
-    #     peak_index, peak_value = processadcdata.detect_prominent_peaks(filtered_df)
+        # Step 3: Detect the prominent peak from the filtered data.
+        peak_index, peak_value = processadcdata.detect_prominent_peaks(filtered_df)
         
-    #     # Step 4: Calculate the distance corresponding to the detected peak index.
-    #     distance = processadcdata.calculate_distance_from_peak(peak_index)
+        # Step 4: Calculate the distance corresponding to the detected peak index.
+        distance = processadcdata.calculate_distance_from_peak(peak_index)
         
-    #     # Step 5: Store the consolidated features in a dictionary, keyed by the calculated distance.
-    #     distance_to_features[distance] = df_features
+        # Step 5: Store the consolidated features in a dictionary, keyed by the calculated distance.
+        distance_to_features[distance] = df_features
         
-    # dfs = []
-    # for dist, df in distance_to_features.items():
-    #     df_copy = df.copy()  # avoid modifying the original DataFrame
-    #     df_copy['distance'] = dist  # add the distance as a new column
-    #     dfs.append(df_copy)
+    dfs = []
+    for dist, df in distance_to_features.items():
+        df_copy = df.copy()  # avoid modifying the original DataFrame
+        df_copy['distance'] = dist  # add the distance as a new column
+        dfs.append(df_copy)
         
-    # combined_df = pd.concat(dfs, ignore_index=True)
+    combined_df = pd.concat(dfs, ignore_index=True)
     
     MODEL_FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Model/peak_classifier_model2.pkl"
     
-    # trained_model = train.peaks_model(combined_df, MODEL_FILE_PATH)
+    trained_model = train.peaks_model(combined_df)
+    
+    joblib.dump(trained_model, MODEL_FILE_PATH)
     
     loaded_model = joblib.load(MODEL_FILE_PATH)
 
