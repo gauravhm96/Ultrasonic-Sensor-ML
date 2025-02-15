@@ -1,13 +1,15 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
                              QPushButton, QRadioButton, QSizePolicy,
-                             QStackedWidget, QVBoxLayout, QWidget,QDialog,QProgressBar,QApplication)
+                             QStackedWidget, QVBoxLayout, QWidget,QDialog,QProgressBar,QApplication,QTextEdit,QGridLayout,QSpacerItem)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 import matplotlib.pyplot as plt
 
+from SignalProcess import SignalProcessor
 from adc_signal_process import ADCSignal,ADCSignalProcess,TrainADC,PredictADC
+
 import numpy as np
 import pandas as pd
 import os
@@ -17,26 +19,42 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 
+# ------------------- Version 1 Global Variables -------------------
+V1_FILE_PATH = None
+
+v1_adc_data = None
+
+
+
+# ------------------- Version 2 Global Variables -------------------
+V2_FILE_PATH = None
+FOLDER_PATH = None
+PREDICT_MODEL_PATH = None
+PREDICT_FILE_PATH = None
+
 my_adc_data = None
-file_path = None
 filtered_myadc_data = None
 peak_index = None
 peak_value = None
 dist = None
-
-FOLDER_PATH = None
 model = None
-PREDICT_MODEL_PATH = None
-PREDICT_FILE_PATH = None
 Loadmodel = None
 X_test = None 
 y_test = None
+# ------------------- Version 2 Global Variables -------------------
 
 def object_detection_features(layout, output_box):
-
+    
+    
+    # ------------------- Version 1 Function Declaration -------------------
+    signalprocess = SignalProcessor()
+    
+    
+    # ------------------- Version 2 Function Declaration -------------------
     myadcdata = ADCSignal()
     processadcdata = ADCSignalProcess()
     train = TrainADC()
+    
     
     # Create a horizontal layout for the version selection section
     detection_label = QLabel("Select version for Object Detection Algoritm")
@@ -81,22 +99,220 @@ def object_detection_features(layout, output_box):
     v1_layout = QVBoxLayout()
     v1_layout.setSpacing(10)
     v1_layout.setContentsMargins(0, 0, 0, 0)
-    v1_layout.setSpacing(5)
-    v1_layout.setAlignment(Qt.AlignTop)  # Align everything at the top
+    v1_layout.setAlignment(Qt.AlignTop)
 
-    # Add a label to indicate this is Version 1 layout
     label_v1 = QLabel("Object Detection Algoritm Type 1")
     label_v1.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
     v1_layout.addWidget(label_v1)
+    
+    def v1_select_file():
+        global v1_adc_data, V1_FILE_PATH
+        V1_FILE_PATH, _ = QFileDialog.getOpenFileName(
+            None, "Select ADC File", "", "ADC Data (*.txt);;CSV (*.csv)"
+        )
+        if V1_FILE_PATH:
+            if "adc" not in V1_FILE_PATH.lower():
+                output_box.append("I think you have not selected ADC Data :( ")
+                return
+            else:
+                v1_file_path_label.setText(V1_FILE_PATH)
+                output_box.append(f"File selected: {V1_FILE_PATH}")
+                try:
+                    signalprocess.set_file_path(V1_FILE_PATH)
+                    v1_adc_data = signalprocess.load_signal_data()
+                    output_box.append("ADC Data Loaded Successfully.")
+                    output_box.append(f"ADC Data:\n{v1_adc_data[:10]}")
+                except Exception as e:
+                    output_box.append(f"Error loading ADC data: {e}")
+    
+    v1_file_layout = QHBoxLayout()
+    v1_file_layout.setSpacing(10)
+    v1_file_layout.setContentsMargins(0, 0, 0, 0)
+    v1_file_layout.setAlignment(Qt.AlignLeft)
+    
+    v1_select_file_button = QPushButton("Select ADC Data")
+    v1_select_file_button.setStyleSheet(
+        "font-size: 18px;font-weight: normal; padding: 5px;"
+    )
+    v1_select_file_button.setFixedWidth(200)
+    v1_select_file_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    v1_select_file_button.clicked.connect(v1_select_file)
+    v1_file_layout.addWidget(v1_select_file_button)
 
-    # Dummy function for Version 1
-    def dummy_function_v1():
-        output_box.append("Dummy function for Version 1 executed.")
+    # Add a QLabel to show the file path
+    v1_file_path_label = QLabel("No file selected")
+    v1_file_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    v1_file_layout.addWidget(v1_file_path_label)
+    v1_layout.addLayout(v1_file_layout)
+    
+    # Create a horizontal layout for all buttons
+    v1_calculatedist_layout = QHBoxLayout()
+    v1_calculatedist_layout.setSpacing(10)  
+    v1_calculatedist_layout.setContentsMargins(0, 0, 0, 0) 
+    v1_calculatedist_layout.setAlignment(Qt.AlignLeft)
+    
+    v1_calculatedist_button = QPushButton("Find First Echo")
+    v1_calculatedist_button.setStyleSheet(
+        "font-size: 18px;font-weight: normal; padding: 5px;"
+    )
+    v1_calculatedist_button.setFixedWidth(200)
+    v1_calculatedist_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    
+    def v1_calculate_distance():
+        global v1_adc_data, V1_FILE_PATH
+        if v1_adc_data is None:
+           output_box.append("No ADC data loaded.")
+           return
+        try:
+            v1_progress_bar.setValue(0)
+            QApplication.processEvents()
+            if signalprocess:
+               # Process the signal
+               signalprocess.analyze_raw_signals()
+               v1_progress_bar.setValue(25)
+               signalprocess.annotate_real_peaks()
+               v1_progress_bar.setValue(50)
+               signalprocess.NoiseFiltering()
+               v1_progress_bar.setValue(75)
+               signalprocess.SignalCorrection()
+               v1_progress_bar.setValue(90)
+               
+               # Calculate the distance
+               distance_info = signalprocess.Calculate_Distance()
+               
+                # Extract the distance value from the returned dictionary
+               distance = distance_info.get("distance", 0.0)
+               
+               v1_progress_bar.setValue(100)
+               
+               # Update the label with the calculated distance
+               v1_dist_label.setText(f"{distance:.2f} m")
+               v1_dist_label.setStyleSheet("font-size: 18px; padding: 5px; border: 3px solid black;background-color: green;")
+               output_box.append("Distance calculation completed successfully.")
+               
+        except Exception as e:
+            output_box.append(f"Error during distance calculation: {e}")
+            
+    v1_calculatedist_button.clicked.connect(v1_calculate_distance)
+    
+    v1_calculatedist_layout.addWidget(v1_calculatedist_button)
+    
+    v1_progress_bar = QProgressBar()
+    v1_progress_bar.setRange(0, 100)  # Set min and max range
+    v1_progress_bar.setValue(0) 
+    v1_progress_bar.setTextVisible(True)  # Display text inside the progress bar
+    v1_progress_bar.setStyleSheet(
+        "QProgressBar {"
+        "    border: 2px solid grey;"
+        "    border-radius: 5px;"
+        "    background-color: #f5f5f5;"
+        "    text-align: center;"
+        "}"
+        "QProgressBar::chunk {"
+        "    background-color: #4caf50;"
+        "    border-radius: 5px;"
+        "}"
+    )
+    v1_calculatedist_layout.addWidget(v1_progress_bar)
+    
+    v1_showcalculation_button = QPushButton("Show Computation")
+    v1_showcalculation_button.setStyleSheet(
+        "font-size: 18px;font-weight: normal; padding: 5px;"
+    )
+    v1_showcalculation_button.setFixedWidth(200)
+    v1_showcalculation_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+    def v1_show_calculation():
+        global v1_adc_data, V1_FILE_PATH
+        v1_progress_bar.setValue(0) 
+        
+        if v1_adc_data is None:
+            output_box.append("No ADC data loaded.")
+            return
+        try:
+            dialog = QDialog()
+            dialog.setWindowTitle("Computation Results")
+            dialog.setFixedSize(2400, 1250)
+            
+            # Main layout with margins and spacing
+            main_layout = QVBoxLayout()
+            main_layout.setContentsMargins(20, 20, 20, 20)
+            main_layout.setSpacing(20)
+            
+            # Title Label
+            title_label = QLabel("Calculations")
+            title_label.setStyleSheet("font-size: 22px; font-weight: bold; padding: 10px;")
+            title_label.setAlignment(Qt.AlignCenter)
+            main_layout.addWidget(title_label)
+            
+            # Description Label
+            description_label = QLabel("Distance calculation and signal processing details.")
+            description_label.setStyleSheet("font-size: 18px; padding: 10px;")
+            description_label.setWordWrap(True)
+            main_layout.addWidget(description_label)
+            
+            # Grid layout for plots
+            plots_layout = QGridLayout()
+            plots_layout.setSpacing(20)
+            plots_layout.setContentsMargins(20, 20, 20, 20)
+            
+            # Get the figures and canvases from your signal processing functions
+            fig1, axs1 = signalprocess.PlotRawSignal()
+            fig1.set_size_inches(10, 6)
+            canvas1 = FigureCanvas(fig1)
+            
+            fig2, axs2 = signalprocess.PlotNoiseFilteredSignal()
+            fig2.set_size_inches(10, 6)
+            canvas2 = FigureCanvas(fig2)
+            
+            fig3, axs3 = signalprocess.PlotSignalCorrection()
+            fig3.set_size_inches(20, 6)
+            canvas3 = FigureCanvas(fig3)
+            
+            # Place canvases in the grid (2 rows x 2 columns; third plot spans both columns)
+            plots_layout.addWidget(canvas1, 0, 0)
+            plots_layout.addWidget(canvas2, 0, 1)
+            plots_layout.addWidget(canvas3, 1, 0, 1, 2)
+            
+            main_layout.addLayout(plots_layout)
+            
+            # Bottom section with a spacer and a centered Close button
+            bottom_layout = QHBoxLayout()
+            bottom_layout.addStretch()
+            close_button = QPushButton("Close")
+            close_button.setFixedSize(150, 40)
+            close_button.setStyleSheet("font-size: 18px; padding: 5px;")
+            close_button.clicked.connect(dialog.close)
+            bottom_layout.addWidget(close_button)
+            bottom_layout.addStretch()
+            main_layout.addLayout(bottom_layout)
+            
+            dialog.setLayout(main_layout)
+            dialog.exec()
+        except Exception as e:
+            output_box.append(f"Error during Rendering calculation Output: {e}")
 
-    # Button to trigger the dummy function for Version 1
-    dummy_button_v1 = QPushButton("Run Dummy Function for Version 1")
-    dummy_button_v1.clicked.connect(dummy_function_v1)
-    v1_layout.addWidget(dummy_button_v1)
+    
+    v1_showcalculation_button.clicked.connect(v1_show_calculation)
+    
+    v1_calculatedist_layout.addWidget(v1_showcalculation_button)
+    
+    v1_dist_label = QLabel("0.0 cm")
+    v1_dist_label.setStyleSheet("font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;")
+
+    v1_calculatedist_layout.addWidget(v1_dist_label)
+    
+    v1_layout.addLayout(v1_calculatedist_layout)
+    
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setFrameShadow(QFrame.Sunken)
+    line.setLineWidth(2)
+    v1_layout.addWidget(line)
+    
+
 
     version1_widget.setLayout(v1_layout)
 
@@ -105,26 +321,26 @@ def object_detection_features(layout, output_box):
     v2_layout = QVBoxLayout()
     v2_layout.setSpacing(10)
     v2_layout.setContentsMargins(0, 0, 0, 0)
-    v2_layout.setAlignment(Qt.AlignTop)  # Align everything at the top
+    v2_layout.setAlignment(Qt.AlignTop) 
 
     label_v2 = QLabel("Object Detection Algoritm Type 2")
     label_v2.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
     v2_layout.addWidget(label_v2)
 
     def select_file():
-        global my_adc_data, file_path
-        file_path, _ = QFileDialog.getOpenFileName(
+        global my_adc_data,V2_FILE_PATH
+        V2_FILE_PATH, _ = QFileDialog.getOpenFileName(
             None, "Select ADC File", "", "ADC Data (*.txt);;CSV (*.csv)"
         )
-        if file_path:
-            if "adc" not in file_path.lower():
+        if V2_FILE_PATH:
+            if "adc" not in V2_FILE_PATH.lower():
                 output_box.append("I think you have not selected ADC Data :( ")
                 return
             else:
-                file_path_label.setText(file_path)
-                output_box.append(f"File selected: {file_path}")
+                file_path_label.setText(V2_FILE_PATH)
+                output_box.append(f"File selected: {V2_FILE_PATH}")
                 try:
-                    my_adc_data = myadcdata.get_adc_data(file_path)
+                    my_adc_data = myadcdata.get_adc_data(V2_FILE_PATH)
                     output_box.append("ADC Data Loaded Successfully.")
                     output_box.append(f"ADC Data:\n{my_adc_data[:10]}")
                 except Exception as e:
@@ -172,7 +388,7 @@ def object_detection_features(layout, output_box):
     v2_layout.addLayout(button_layout)
     
     def view_adc_data():
-        global my_adc_data,file_path
+        global my_adc_data
         if my_adc_data is None:
            output_box.append("No ADC data loaded.")
            return
@@ -182,7 +398,7 @@ def object_detection_features(layout, output_box):
             output_box.append(f"An error occurred while viewing data: {e}")
     
     def Perform_fft():
-        global my_adc_data,file_path,filtered_myadc_data
+        global my_adc_data,V2_FILE_PATH,filtered_myadc_data
         if my_adc_data is None:
            output_box.append("No ADC data loaded.")
            return
@@ -223,7 +439,7 @@ def object_detection_features(layout, output_box):
             canvas = FigureCanvas(fig)
             toolbar = NavigationToolbar2QT(canvas)
             plot_dialog = QDialog()
-            plot_dialog.setWindowTitle(f"{file_path}")
+            plot_dialog.setWindowTitle(f"{V2_FILE_PATH}")
             dialog_layout = QVBoxLayout(plot_dialog)
             dialog_layout.addWidget(toolbar)
             dialog_layout.addWidget(canvas)
@@ -233,7 +449,7 @@ def object_detection_features(layout, output_box):
             output_box.append(f"An error occurred while viewing data: {e}")
     
     def view_noiseless_data():
-        global my_adc_data,file_path,filtered_myadc_data
+        global my_adc_data,filtered_myadc_data
         if my_adc_data is None:
            output_box.append("No ADC data loaded.")
            return
@@ -246,7 +462,7 @@ def object_detection_features(layout, output_box):
             output_box.append(f"An error occurred while viewing data: {e}")
     
     def calculate_dist():
-        global my_adc_data,file_path,filtered_myadc_data,peak_index, peak_value,dist
+        global my_adc_data,filtered_myadc_data,peak_index, peak_value,dist
         if my_adc_data is None:
            output_box.append("No ADC data loaded.")
            return
@@ -266,6 +482,7 @@ def object_detection_features(layout, output_box):
             output_box.append(f"An error occurred while viewing data: {e}")
     
     def plot_adc_data(adc_data):
+        global V2_FILE_PATH
         if adc_data is None or adc_data.empty:
             print("No Data Available")
             return
@@ -281,7 +498,7 @@ def object_detection_features(layout, output_box):
             canvas = FigureCanvas(fig)
             toolbar = NavigationToolbar2QT(canvas)
             plot_dialog = QDialog()
-            plot_dialog.setWindowTitle(f"{file_path}")
+            plot_dialog.setWindowTitle(f"{V2_FILE_PATH}")
             dialog_layout = QVBoxLayout(plot_dialog)
             dialog_layout.addWidget(toolbar)
             dialog_layout.addWidget(canvas)
@@ -291,7 +508,7 @@ def object_detection_features(layout, output_box):
             output_box.append(f"An error occurred while viewing data: {e}")
     
     def view_peaks():
-        global my_adc_data,file_path,filtered_myadc_data,peak_index,peak_value
+        global my_adc_data,V2_FILE_PATH,filtered_myadc_data,peak_index,peak_value
         if my_adc_data is None:
            output_box.append("No ADC data loaded.")
            return
@@ -312,7 +529,7 @@ def object_detection_features(layout, output_box):
            canvas = FigureCanvas(fig)
            toolbar = NavigationToolbar2QT(canvas)
            plot_dialog = QDialog()
-           plot_dialog.setWindowTitle(f"{file_path}")
+           plot_dialog.setWindowTitle(f"{V2_FILE_PATH}")
            dialog_layout = QVBoxLayout(plot_dialog)
            dialog_layout.addWidget(toolbar)
            dialog_layout.addWidget(canvas)
@@ -327,7 +544,6 @@ def object_detection_features(layout, output_box):
     button_layout.itemAt(3).widget().clicked.connect(calculate_dist)
     button_layout.itemAt(4).widget().clicked.connect(view_peaks)
     
-       # Add a QLabel to show the file path
     dist_label = QLabel("0.0 cm")
     dist_label.setStyleSheet(
         "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
