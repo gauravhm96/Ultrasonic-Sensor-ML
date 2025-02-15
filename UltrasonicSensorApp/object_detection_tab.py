@@ -7,7 +7,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 import matplotlib.pyplot as plt
 
-from adc_signal_process import ADCSignal,ADCSignalProcess,TrainADC
+from adc_signal_process import ADCSignal,ADCSignalProcess,TrainADC,PredictADC
 import numpy as np
 import pandas as pd
 import os
@@ -26,9 +26,9 @@ dist = None
 
 FOLDER_PATH = None
 model = None
-predictmodelpath = None
-predictfilepath = None
-Loadcnnmodel = None
+PREDICT_MODEL_PATH = None
+PREDICT_FILE_PATH = None
+Loadmodel = None
 X_test = None 
 y_test = None
 
@@ -586,6 +586,179 @@ def object_detection_features(layout, output_box):
     save_model_button.clicked.connect(save_trained_model)
 
     v2_layout.addLayout(Train_button_layout)
+    
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setFrameShadow(QFrame.Sunken)
+    line.setLineWidth(2)
+    v2_layout.addWidget(line)
+    
+    predictmodelspacer_title = QLabel("Predict Model")
+    predictmodelspacer_title.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    v2_layout.addWidget(predictmodelspacer_title)
+    
+    Predict_button_layout = QHBoxLayout()
+    Predict_button_layout.setSpacing(10)  # Spacing between buttons
+    Predict_button_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+    Predict_button_layout.setAlignment(Qt.AlignLeft)
+    
+    # Add new buttons
+    select_predictmodel_button = QPushButton("Select Model")
+    select_predictmodel_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    select_predictmodel_button.setFixedWidth(200)
+    Predict_button_layout.addWidget(select_predictmodel_button)
+    
+    model_path_label = QLabel("No File selected")
+    model_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    model_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(model_path_label)
+    
+    # -------- Select File Button --------
+    select_predictfile_button = QPushButton("  Select File  ")
+    select_predictfile_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    select_predictfile_button.setFixedWidth(200)
+    Predict_button_layout.addWidget(select_predictfile_button)
+    
+    # File Path Label
+    predictfile_path_label = QLabel("No File Selected")
+    predictfile_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    predictfile_path_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(predictfile_path_label)
+    
+    predictselectedfile_button = QPushButton("Predict")
+    predictselectedfile_button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+    predictselectedfile_button.setFixedWidth(200)
+    predictselectedfile_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    Predict_button_layout.addWidget(predictselectedfile_button)
+    
+    # Function to open folder dialog and set path
+    def select_predictionmodel():
+        global PREDICT_MODEL_PATH,Loadmodel
+        PREDICT_MODEL_PATH, _ = QFileDialog.getOpenFileName(None, "Select Model", "", "H5 Files (*.pkl);;All Files (*)")
+        if PREDICT_MODEL_PATH:
+           
+           Loadmodel = joblib.load(PREDICT_MODEL_PATH)
+           model_path_label.setText(os.path.basename(PREDICT_MODEL_PATH))
+           output_box.append(f"Model selected: {PREDICT_MODEL_PATH}")
+        else:
+           output_box.append("Invalid Model or File..!!")
+           
+    def select_predictfile():
+        global PREDICT_MODEL_PATH,PREDICT_FILE_PATH
+        PREDICT_FILE_PATH, _ = QFileDialog.getOpenFileName(None, "Select File", "", "Txt Files (*.txt);;All Files (*)")
+        
+        if "adc" not in PREDICT_FILE_PATH.lower():
+            output_box.append("I think you have not selected ADC Data :( ")
+            return
+        else:
+            predictfile_path_label.setText(os.path.basename(PREDICT_FILE_PATH))
+            output_box.append("ADC Data Loaded Successfully.")
+            try:
+                output_box.append(f"File selected: {PREDICT_FILE_PATH}")
+                
+            except Exception as e:
+                output_box.append(f"Error loading ADC data: {e}")
+    
+    def predict_adc():
+        global PREDICT_MODEL_PATH,PREDICT_FILE_PATH,Loadmodel
+        if "adc" not in PREDICT_FILE_PATH.lower():
+            output_box.append("I think you have not selected ADC Data :( ")
+            return
+        elif Loadmodel is None:
+            output_box.append("Error: No trained model found. Train the model first.")
+            return
+        elif PREDICT_FILE_PATH is not None :
+            try:
+                predictdata = PredictADC()
+                lowcut = 39500.0  # Lower cutoff frequency in Hz
+                highcut = 41500.0  # Upper cutoff frequency in Hz
+                fs = 1.953125e6  # Sampling frequency in Hz (as per RED Pitaya)
+                sos = processadcdata.butter_bandpass(lowcut, highcut, fs)
+                
+                predict_adc_data = myadcdata.get_adc_data(PREDICT_FILE_PATH)
+                
+                adc_data_array = predict_adc_data.to_numpy()
+                filtered_data_array = np.apply_along_axis(
+                    processadcdata.apply_bandpass_filter, 1, adc_data_array, sos
+                )
+                filtered_myadc_data = pd.DataFrame(filtered_data_array)
+                
+                peak_features = train.process_adc_data_dataframe(filtered_myadc_data)
+                df_features = train.consolidate_peak_features(peak_features)
+                
+                df_features = df_features.copy()
+                df_features["distance"] = 0.0
+                feature_columns = ['candidate_peak_index', 'amplitude', 'prominence', 'distance']   
+                df_features["predicted_label"] = Loadmodel.predict(df_features[feature_columns])
+                
+                df_first_echo = predictdata.identify_first_echo(df_features)
+
+                predicted_peaks = df_features[df_features["predicted_label"] == 1].copy()
+
+                # Check if any predicted peaks exist
+                if not predicted_peaks.empty:
+                    # Find the row with the maximum amplitude among predicted peaks
+                    max_peak_row = predicted_peaks.loc[predicted_peaks["amplitude"].idxmax()]
+
+                    highest_peak_index = max_peak_row["candidate_peak_index"]
+                    highest_peak_amplitude = max_peak_row["amplitude"]
+
+                    output_box.append(f"Highest Predicted Peak Index: {highest_peak_index}")
+                    output_box.append(f"Highest Predicted Peak Amplitude: {highest_peak_amplitude}")
+                    
+                    dist = (processadcdata.calculate_distance_from_peak(highest_peak_index))*100
+                    output_box.append(f"First Echo Detected at Dist: {dist} cm")
+                else:
+                    output_box.append("No predicted peaks were found.")
+                    return
+                
+                fig = plt.figure(figsize=(10, 6))
+                # Plot all filtered ADC signal rows in light gray.
+                for index, row in filtered_myadc_data.iterrows():
+                    plt.plot(row, color="lightgray", linewidth=0.5, alpha=0.7)
+                
+                # Mark each predicted peak with an "x"
+                for idx, row in predicted_peaks.iterrows():
+                    x_val = row["candidate_peak_index"]
+                    y_val = row["amplitude"]
+                    plt.plot(x_val, y_val, "x", markersize=5)
+                
+                # Draw vertical line for highest predicted peak index
+                plt.axvline(x=highest_peak_index, color="red", linestyle="--", 
+                            label=f"Peak Index: {highest_peak_index}")
+                # Draw horizontal line for highest predicted peak amplitude
+                plt.axhline(y=highest_peak_amplitude, color="blue", linestyle="--", 
+                            label=f"Peak Amplitude: {highest_peak_amplitude}")
+                
+                plt.title("Filtered ADC Signals with Predicted Peaks")
+                plt.xlabel("Sample Index")
+                plt.ylabel("Amplitude")
+                plt.legend()
+                plt.grid(True)
+                plt.tight_layout()
+                canvas = FigureCanvas(fig)
+                toolbar = NavigationToolbar2QT(canvas)
+                plot_dialog = QDialog()
+                plot_dialog.setWindowTitle(f"{PREDICT_FILE_PATH}")
+                dialog_layout = QVBoxLayout(plot_dialog)
+                dialog_layout.addWidget(toolbar)
+                dialog_layout.addWidget(canvas)
+                plot_dialog.exec_()
+                output_box.append("Data Loaded Successfully..!!")
+                PREDICT_FILE_PATH = None
+                
+            except Exception as e:
+                output_box.append(f"Error loading ADC data: {e}")
+                    
+    select_predictmodel_button.clicked.connect(select_predictionmodel)
+    select_predictfile_button.clicked.connect(select_predictfile)
+    predictselectedfile_button.clicked.connect(predict_adc)
+            
+    v2_layout.addLayout(Predict_button_layout)
     
     version2_widget.setLayout(v2_layout)
 

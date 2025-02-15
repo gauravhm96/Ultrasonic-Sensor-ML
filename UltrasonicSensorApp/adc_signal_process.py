@@ -457,69 +457,67 @@ if __name__ == "__main__":
     # else:
     #     print("No predicted peaks were found.")
 
+    # adc_data_list = []
+    
+    # # Iterate over all files in the folder, label index starts from 1
+    # for idx, filename in enumerate(os.listdir(FOLDER_PATH), start=1):
+    #     # Optionally, only process .txt files (adjust extension if needed)
+    #     if filename.endswith('.txt'):
+    #         FILE_PATH = os.path.join(FOLDER_PATH, filename)
+    #         # Read ADC data from file using your get_adc_data function
+    #         my_adc_data = myadcdata.get_adc_data(FILE_PATH)
+    #         # Append a tuple containing the label (index) and the ADC data
+    #         adc_data_list.append((idx, my_adc_data))
 
+    # filtered_data_list = []
     
-    adc_data_list = []
+    # for label, my_adc_data in adc_data_list:
+    #     # Convert the DataFrame to a NumPy array
+    #     adc_data_array = my_adc_data.to_numpy()
+        
+    #     # Apply the bandpass filter to each row of the ADC data array
+    #     filtered_data_array = np.apply_along_axis(processadcdata.apply_bandpass_filter, 1, adc_data_array, sos)
+        
+    #     # Convert the filtered data back to a DataFrame
+    #     filtered_myadc_data = pd.DataFrame(filtered_data_array)
+        
+    #     # Append the tuple (label, filtered ADC data) to the list
+    #     filtered_data_list.append((label, filtered_myadc_data))
+        
+    # peak_features = train.process_adc_data_dataframe(filtered_myadc_data)
+    # df_features = train.consolidate_peak_features(peak_features)
     
-    # Iterate over all files in the folder, label index starts from 1
-    for idx, filename in enumerate(os.listdir(FOLDER_PATH), start=1):
-        # Optionally, only process .txt files (adjust extension if needed)
-        if filename.endswith('.txt'):
-            FILE_PATH = os.path.join(FOLDER_PATH, filename)
-            # Read ADC data from file using your get_adc_data function
-            my_adc_data = myadcdata.get_adc_data(FILE_PATH)
-            # Append a tuple containing the label (index) and the ADC data
-            adc_data_list.append((idx, my_adc_data))
-
-    filtered_data_list = []
+    # distance_to_features = {}
     
-    for label, my_adc_data in adc_data_list:
-        # Convert the DataFrame to a NumPy array
-        adc_data_array = my_adc_data.to_numpy()
+    # for file_label, filtered_df in filtered_data_list:
+    #     # Step 1: Process the filtered ADC DataFrame to extract candidate peak features.
+    #     peak_features = train.process_adc_data_dataframe(filtered_df)
         
-        # Apply the bandpass filter to each row of the ADC data array
-        filtered_data_array = np.apply_along_axis(processadcdata.apply_bandpass_filter, 1, adc_data_array, sos)
+    #     # Step 2: Consolidate these features into a DataFrame.
+    #     df_features = train.consolidate_peak_features(peak_features)
         
-        # Convert the filtered data back to a DataFrame
-        filtered_myadc_data = pd.DataFrame(filtered_data_array)
+    #     # Step 3: Detect the prominent peak from the filtered data.
+    #     peak_index, peak_value = processadcdata.detect_prominent_peaks(filtered_df)
         
-        # Append the tuple (label, filtered ADC data) to the list
-        filtered_data_list.append((label, filtered_myadc_data))
+    #     # Step 4: Calculate the distance corresponding to the detected peak index.
+    #     distance = processadcdata.calculate_distance_from_peak(peak_index)
         
-    peak_features = train.process_adc_data_dataframe(filtered_myadc_data)
-    df_features = train.consolidate_peak_features(peak_features)
-    
-    distance_to_features = {}
-    
-    for file_label, filtered_df in filtered_data_list:
-        # Step 1: Process the filtered ADC DataFrame to extract candidate peak features.
-        peak_features = train.process_adc_data_dataframe(filtered_df)
+    #     # Step 5: Store the consolidated features in a dictionary, keyed by the calculated distance.
+    #     distance_to_features[distance] = df_features
         
-        # Step 2: Consolidate these features into a DataFrame.
-        df_features = train.consolidate_peak_features(peak_features)
+    # dfs = []
+    # for dist, df in distance_to_features.items():
+    #     df_copy = df.copy()  # avoid modifying the original DataFrame
+    #     df_copy['distance'] = dist  # add the distance as a new column
+    #     dfs.append(df_copy)
         
-        # Step 3: Detect the prominent peak from the filtered data.
-        peak_index, peak_value = processadcdata.detect_prominent_peaks(filtered_df)
-        
-        # Step 4: Calculate the distance corresponding to the detected peak index.
-        distance = processadcdata.calculate_distance_from_peak(peak_index)
-        
-        # Step 5: Store the consolidated features in a dictionary, keyed by the calculated distance.
-        distance_to_features[distance] = df_features
-        
-    dfs = []
-    for dist, df in distance_to_features.items():
-        df_copy = df.copy()  # avoid modifying the original DataFrame
-        df_copy['distance'] = dist  # add the distance as a new column
-        dfs.append(df_copy)
-        
-    combined_df = pd.concat(dfs, ignore_index=True)
+    # combined_df = pd.concat(dfs, ignore_index=True)
     
     MODEL_FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Model/peak_classifier_model2.pkl"
     
-    trained_model = train.peaks_model(combined_df)
+    # trained_model = train.peaks_model(combined_df)
     
-    joblib.dump(trained_model, MODEL_FILE_PATH)
+    # joblib.dump(trained_model, MODEL_FILE_PATH)
     
     loaded_model = joblib.load(MODEL_FILE_PATH)
 
