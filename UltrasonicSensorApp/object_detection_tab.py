@@ -8,6 +8,9 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 import matplotlib.pyplot as plt
 
 from SignalProcess import SignalProcessor
+from ObjectDetectionFeatureExtract import FeatureExtract
+from ObjectDetectionTraining import BinaryImageClassifier
+
 from adc_signal_process import ADCSignal,ADCSignalProcess,TrainADC,PredictADC
 
 import numpy as np
@@ -21,8 +24,8 @@ from sklearn.model_selection import KFold, cross_val_score, train_test_split
 
 # ------------------- Version 1 Global Variables -------------------
 V1_FILE_PATH = None
-
 v1_adc_data = None
+shared_data = {}
 
 
 
@@ -48,6 +51,7 @@ def object_detection_features(layout, output_box):
     
     # ------------------- Version 1 Function Declaration -------------------
     signalprocess = SignalProcessor()
+    extractfeature = FeatureExtract()
     
     
     # ------------------- Version 2 Function Declaration -------------------
@@ -312,7 +316,320 @@ def object_detection_features(layout, output_box):
     line.setLineWidth(2)
     v1_layout.addWidget(line)
     
+    v1_trainingmodelspacer_title = QLabel("Train Model")
+    v1_trainingmodelspacer_title.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    v1_layout.addWidget(v1_trainingmodelspacer_title)
+    
+    v1_train_layout = QHBoxLayout()
+    v1_train_layout.setSpacing(10)
+    v1_train_layout.setContentsMargins(0, 0, 0, 0)
+    v1_train_layout.setAlignment(Qt.AlignLeft)
+    
+    v1_select_trainfile_button = QPushButton("Select ADC Data")
+    v1_select_trainfile_button.setStyleSheet(
+        "font-size: 18px;font-weight: normal; padding: 5px;"
+    )
+    v1_select_trainfile_button.setFixedWidth(200)
+    v1_select_trainfile_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    
+    def v1_select_file_train():
+        global v1_adc_data, V1_FILE_PATH
+        V1_FILE_PATH, _ = QFileDialog.getOpenFileName(
+            None, "Select ADC File", "", "ADC Data (*.txt);;CSV (*.csv)"
+        )
+        if V1_FILE_PATH:
+            if "adc" not in V1_FILE_PATH.lower():
+                output_box.append("I think you have not selected ADC Data :( ")
+                return
+            else:
+                v1_trainfile_path_label.setText(os.path.basename(V1_FILE_PATH))
+                output_box.append(f"File selected: {V1_FILE_PATH}")
+                try:
+                    signalprocess.set_file_path(V1_FILE_PATH)
+                    v1_adc_data = signalprocess.load_signal_data()
+                    output_box.append("ADC Data Loaded Successfully.")
+                    output_box.append(f"ADC Data:\n{v1_adc_data[:10]}")
+                except Exception as e:
+                    output_box.append(f"Error loading ADC data: {e}")
+        
+    v1_select_trainfile_button.clicked.connect(v1_select_file_train)
+    v1_train_layout.addWidget(v1_select_trainfile_button)
 
+    # Add a QLabel to show the file path
+    v1_trainfile_path_label = QLabel("No file selected")
+    v1_trainfile_path_label.setStyleSheet(
+        "font-size: 18px; padding: 5px; border: 1px solid black;background-color: white;"
+    )
+    v1_train_layout.addWidget(v1_trainfile_path_label)
+    
+    # Add the required buttons
+    v1_trainbuttons = ["Analyze Signal", "Type 1-Spectgrm Peak", "Type 2-Spectgrm Peak Spect", "Spectgrm Non-Peak"]
+    for button_name in v1_trainbuttons:
+        button = QPushButton(button_name)
+        button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+        button.setFixedWidth(250)  # Set a fixed width for the buttons
+        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        v1_train_layout.addWidget(button)
+        
+    def analyze_signal():
+        global v1_adc_data,shared_data
+        if v1_adc_data is None:
+           output_box.append("No ADC data loaded.")
+           return
+        else:
+            try:
+                output_box.append("Signal analysis started...")
+                
+                signalprocess.load_signal_data()
+                v1_trainprogress_bar.setValue(20)  # Update progress to 20%
+                output_box.append("Signal data loaded.")
+                
+                signalprocess.analyze_raw_signals()
+                v1_trainprogress_bar.setValue(20)  # Update progress to 40%
+                output_box.append("Raw signals analyzed.")
+                
+                signalprocess.annotate_real_peaks()
+                v1_trainprogress_bar.setValue(40)  # Update progress to 50%
+                output_box.append("Real peaks annotated.")
+                
+                updated_signals, threshold_info = signalprocess.NoiseFiltering()
+                v1_trainprogress_bar.setValue(50)  # Update progress to 60%
+                output_box.append("Noise filtering applied.")        
+                output_box.append(f"Updated Signals: {updated_signals}")
+                output_box.append(f"Threshold Info: {threshold_info}")
+                
+                updated_signals, overall_threshold = extractfeature.apply_threshold_filtering(updated_signals)
+                v1_trainprogress_bar.setValue(60)  # Update progress to 70%
+                output_box.append("Threshold filtering applied.")
+                output_box.append(f"Updated Signals: {updated_signals}")
+                output_box.append(f"Threshold Info: {overall_threshold}")
+                shared_data['updated_signals'] = updated_signals
+                
+                selected_peak_windows = extractfeature.extract_peak_windows(updated_signals)
+                v1_trainprogress_bar.setValue(70)  # Update progress to 80%
+                output_box.append("Peak windows extracted.")
+                output_box.append(f"Updated Signals: {selected_peak_windows}")
+                shared_data['selected_peak_windows'] = selected_peak_windows
+                
+                selected_non_peak_windows = extractfeature.extract_non_peak_windows(updated_signals)
+                v1_trainprogress_bar.setValue(80) # Update progress to 90%
+                output_box.append(f"Updated Signals: {selected_non_peak_windows}")
+                shared_data['selected_non_peak_windows'] = selected_non_peak_windows        
+                
+                window_duration,ADC_SAMPLE_FREQUENCY = extractfeature.calulate_window(num_samples_per_window=300)
+                v1_trainprogress_bar.setValue(95)  # Update progress to 90%
+                output_box.append("window_duration Determined!")      
+                output_box.append(f"Window duration: {window_duration}, ADC Sample Frequency: {ADC_SAMPLE_FREQUENCY}")
+                shared_data['ADC_SAMPLE_FREQUENCY'] = ADC_SAMPLE_FREQUENCY
+                
+                output_box.append("Feature Extraction Completed..!!")
+                v1_trainprogress_bar.setValue(100)  # Update progress to 100%
+                
+            except Exception as e:
+                output_box.append(f"An error occurred while Analyzing data: {e}")
+                
+    
+    def Generate_Spectogram_PeaksType1():
+        v1_trainprogress_bar.setValue(0)
+        global v1_adc_data,shared_data
+        if v1_adc_data is None:
+           output_box.append("No ADC data loaded.")
+           return
+        else:
+            try:
+                output_box.append("Generating Spectrograms...")
+               
+                folder_path = os.path.dirname(os.path.abspath(__file__))
+                PeakSpectrogramType1 = os.path.join(folder_path, "PeakspectrogramType1")
+        
+                if not os.path.exists(PeakSpectrogramType1):
+                   os.makedirs(PeakSpectrogramType1)
+                   output_box.append(f"Folder 'Peakspectrogram' created at {PeakSpectrogramType1}")
+                else:
+                   output_box.append(f"Folder 'Peakspectrogram' already exists at {PeakSpectrogramType1}")
+        
+                   output_box.append("Preparing to save spectrograms...")
+                   v1_trainprogress_bar.setValue(10)
+        
+                   output_box.append("Processing selected peaks...")
+        
+                   v1_trainprogress_bar.setValue(30)
+                   QApplication.processEvents()
+        
+                   extractfeature.save_PeakSspectrogramsType_1(shared_data['selected_peak_windows'],
+                                                    shared_data['updated_signals'],
+                                                    PeakSpectrogramType1,
+                                                    num_samples_per_window= 300,ADC_SAMPLE_FREQUENCY=shared_data["ADC_SAMPLE_FREQUENCY"]
+                                                    )
+        
+                   output_box.append("Saving spectrograms...")
+                   v1_trainprogress_bar.setValue(100)
+                   output_box.append("Spectrograms Generated...!!")
+            except Exception as e:
+                output_box.append(f"An error occurred while Generating Spectograms: {e}")
+
+    def Generate_Spectogram_PeaksType2():
+        v1_trainprogress_bar.setValue(0)
+        global v1_adc_data,shared_data
+        if v1_adc_data is None:
+           output_box.append("No ADC data loaded.")
+           return
+        else:
+            try:
+                output_box.append("Generating Spectrograms...")
+                    
+                folder_path = os.path.dirname(os.path.abspath(__file__))
+                PeakSpectrogramType2 = os.path.join(folder_path, "PeakspectrogramType2")
+                
+                if not os.path.exists(PeakSpectrogramType2):
+                   os.makedirs(PeakSpectrogramType2)
+                   output_box.append(f"Folder 'Peakspectrogram' created at {PeakSpectrogramType2}")
+                else:
+                   output_box.append(f"Folder 'Peakspectrogram' already exists at {PeakSpectrogramType2}")
+                   
+                output_box.append("Preparing to save spectrograms...")
+                v1_trainprogress_bar.setValue(10)
+                
+                output_box.append("Processing selected peaks...")
+                
+                v1_trainprogress_bar.setValue(30)
+                QApplication.processEvents()
+                    
+                extractfeature.save_PeakSspectrogramsType_2(shared_data['selected_peak_windows'], PeakSpectrogramType2, figure_size = (3, 3))
+                
+                output_box.append("Saving spectrograms...")
+                v1_trainprogress_bar.setValue(100)
+                
+                output_box.append("Spectrograms Generated...!!")
+                    
+            except Exception as e:
+                output_box.append(f"An error occurred while Generating Spectograms: {e}")
+                
+    def Generate_Spectogram_NonPeaks():
+        v1_trainprogress_bar.setValue(0)
+        global v1_adc_data,shared_data
+        if v1_adc_data is None:
+           output_box.append("No ADC data loaded.")
+           return
+        else:
+            try:
+                output_box.append("Generating Spectrograms...")
+                
+                folder_path = os.path.dirname(os.path.abspath(__file__))
+                NonPeakSpectrogram = os.path.join(folder_path, "NonPeakspectrogram")
+                
+                if not os.path.exists(NonPeakSpectrogram):
+                    os.makedirs(NonPeakSpectrogram)
+                    output_box.append(f"Folder 'Peakspectrogram' created at {NonPeakSpectrogram}")
+                else:
+                    output_box.append(f"Folder 'Peakspectrogram' already exists at {NonPeakSpectrogram}")
+                    
+                output_box.append("Preparing to save spectrograms...")
+                v1_trainprogress_bar.setValue(10)
+                
+                output_box.append("Processing selected peaks...")
+                
+                v1_trainprogress_bar.setValue(30)
+
+                QApplication.processEvents()
+                    
+                extractfeature.save_NonPeakSspectrograms(shared_data['selected_non_peak_windows'], NonPeakSpectrogram)
+                
+                output_box.append("Saving spectrograms...")
+                v1_trainprogress_bar.setValue(100)
+                
+                output_box.append("Spectrograms Generated...!!")
+                
+            except Exception as e:
+                output_box.append(f"An error occurred while Generating Spectograms: {e}")
+    
+    v1_train_layout.itemAt(2).widget().clicked.connect(analyze_signal)
+    v1_train_layout.itemAt(3).widget().clicked.connect(Generate_Spectogram_PeaksType1)  
+    v1_train_layout.itemAt(4).widget().clicked.connect(Generate_Spectogram_PeaksType2)  
+    v1_train_layout.itemAt(5).widget().clicked.connect(Generate_Spectogram_NonPeaks)  
+
+    v1_layout.addLayout(v1_train_layout)
+    
+    TrainingProgress_layout = QVBoxLayout()
+    TrainingProgress_layout.setSpacing(10)
+    TrainingProgress_layout.setContentsMargins(0, 0, 0, 0)
+    TrainingProgress_layout.setAlignment(Qt.AlignTop)
+    
+    v1_trainprogress_bar = QProgressBar()
+    v1_trainprogress_bar.setRange(0, 100)  # Set min and max range
+    v1_trainprogress_bar.setValue(0) 
+    v1_trainprogress_bar.setTextVisible(True)  # Display text inside the progress bar
+    v1_trainprogress_bar.setStyleSheet(
+        "QProgressBar {"
+        "    border: 2px solid grey;"
+        "    border-radius: 5px;"
+        "    background-color: #f5f5f5;"
+        "    text-align: center;"
+        "}"
+        "QProgressBar::chunk {"
+        "    background-color: #4caf50;"
+        "    border-radius: 5px;"
+        "}"
+    )
+    TrainingProgress_layout.addWidget(v1_trainprogress_bar)
+    v1_layout.addLayout(TrainingProgress_layout)
+    
+    v1_trainsave_layout = QHBoxLayout()
+    v1_trainsave_layout.setSpacing(10)
+    v1_trainsave_layout.setContentsMargins(0, 0, 0, 0)
+    v1_trainsave_layout.setAlignment(Qt.AlignLeft)
+    
+    # Add the required buttons
+    v1_trainsavebuttons = ["Train Model", "View Model Performance", "Save Model"]
+    for button_name in v1_trainsavebuttons:
+        button = QPushButton(button_name)
+        button.setStyleSheet("font-size: 18px;font-weight: normal; padding: 5px;")
+        button.setFixedWidth(250)  # Set a fixed width for the buttons
+        button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        v1_trainsave_layout.addWidget(button)
+    
+    v1_layout.addLayout(v1_trainsave_layout)
+    
+    def v1_train_model():
+        v1_trainprogress_bar.setValue(0)
+        try:
+            output_box.append("Training model...")
+            folder_path = os.path.dirname(os.path.abspath(__file__))
+            PeakSpectrogram = os.path.join(folder_path, "PeakspectrogramType1")
+            NonPeakSpectrogram = os.path.join(folder_path, "NonPeakspectrogram")
+            
+            classifier = BinaryImageClassifier(PeakSpectrogram, NonPeakSpectrogram)
+            v1_trainprogress_bar.setValue(30)
+            QApplication.processEvents()
+            
+            x_train, x_val, y_train, y_val = classifier.load_and_prepare_data()
+            v1_trainprogress_bar.setValue(45)
+            QApplication.processEvents()
+            
+            classifier.build_model()
+            v1_trainprogress_bar.setValue(55)
+            QApplication.processEvents()
+            
+            classifier.train_model(x_train, y_train, x_val, y_val)
+            v1_trainprogress_bar.setValue(90)
+            QApplication.processEvents()
+            
+            
+            results = classifier.evaluate_model(x_val, y_val)
+            print("Final Evaluation Results:", results)
+            progress_bar.setValue(100)  # Update progress to 100%
+
+            output_box.append("Model training completed!")
+            
+        except Exception as e:
+            output_box.append(f"An error occurred while Training Data: {e}")
+                
+    
+    v1_trainsave_layout.itemAt(0).widget().clicked.connect(v1_train_model)
+    
+    
+    
+    
 
     version1_widget.setLayout(v1_layout)
 
