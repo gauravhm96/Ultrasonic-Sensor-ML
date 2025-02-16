@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import (
 )
 
 from distanceML import distanceMLFeatureExtract
-from general_tab import add_general_features
 from object_differentiation_tab import object_differentiation_features
 from object_detection_tab import object_detection_features
 
@@ -58,12 +57,11 @@ class SettingsWindow(QMainWindow):
         self.output_box.setFixedHeight(250)  # Adjust height as needed
 
         # Add tabs to the tab widget
-        tab_widget.addTab(self.general_tab(), "General")
-        tab_widget.addTab(self.ML_tab(), "ML Tab")
-        tab_widget.addTab(self.advanced_tab(), "Advanced")
         tab_widget.addTab(self.Object_Differentiation(), "Object Differentiation")
         tab_widget.addTab(self.Object_Detection(), "Object Detection")
+        tab_widget.addTab(self.advanced_tab(), "Advanced")
         tab_widget.addTab(self.about_tab(), "About")
+        # tab_widget.addTab(self.ML_tab(), "ML Tab")
 
         # Add OK, Cancel, and Exit buttons at the bottom
         button_layout = QHBoxLayout()
@@ -109,26 +107,6 @@ class SettingsWindow(QMainWindow):
     def cancel_action(self):
         """Handle Cancel button click."""
         sys.exit("Program terminated by user.")
-
-    def general_tab(self):
-
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        label = QLabel("General Settings")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
-
-        layout.addWidget(label)
-
-        # Call the function from features.py to add more features
-        add_general_features(
-            layout, self.output_box
-        )  # This will add the additional features to the layout
-
-        layout.addStretch()  # Push contents to the top
-
-        tab.setLayout(layout)
-        return tab
 
     def ML_tab(self):
 

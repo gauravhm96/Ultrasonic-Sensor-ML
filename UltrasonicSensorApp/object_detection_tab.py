@@ -598,26 +598,38 @@ def object_detection_features(layout, output_box):
             PeakSpectrogram = os.path.join(folder_path, "PeakspectrogramType1")
             NonPeakSpectrogram = os.path.join(folder_path, "NonPeakspectrogram")
             
+            output_box.append("Initializing BinaryImageClassifier...")
             classifier = BinaryImageClassifier(PeakSpectrogram, NonPeakSpectrogram)
             v1_trainprogress_bar.setValue(30)
             QApplication.processEvents()
             
+            output_box.append("Loading and preparing training data...")
             x_train, x_val, y_train, y_val = classifier.load_and_prepare_data()
             v1_trainprogress_bar.setValue(45)
             QApplication.processEvents()
             
+            output_box.append("Building model architecture...")
             classifier.build_model()
             v1_trainprogress_bar.setValue(55)
             QApplication.processEvents()
             
-            classifier.train_model(x_train, y_train, x_val, y_val)
+            output_box.append("Training model on dataset...")
+            
+            history = classifier.train_model(x_train, y_train, x_val, y_val)
             v1_trainprogress_bar.setValue(90)
+            # Check if history is not None before printing training details
+            if history is not None:
+                # Assuming history is a dictionary with lists for 'loss' and 'accuracy'
+                output_box.append(f"Final Training Loss: {history['loss'][-1]:.4f}")
+                output_box.append(f"Final Training Accuracy: {history['accuracy'][-1]:.4f}")
+            else:
+                output_box.append("No training log available.")
             QApplication.processEvents()
             
-            
+            output_box.append("Evaluating model performance...")
             results = classifier.evaluate_model(x_val, y_val)
-            print("Final Evaluation Results:", results)
-            progress_bar.setValue(100)  # Update progress to 100%
+            output_box.append("Final Evaluation Results: " + str(results))
+            v1_trainprogress_bar.setValue(100)  # Update progress to 100%
 
             output_box.append("Model training completed!")
             
@@ -629,7 +641,6 @@ def object_detection_features(layout, output_box):
     
     
     
-    
 
     version1_widget.setLayout(v1_layout)
 
@@ -637,7 +648,7 @@ def object_detection_features(layout, output_box):
     version2_widget = QWidget()
     v2_layout = QVBoxLayout()
     v2_layout.setSpacing(10)
-    v2_layout.setContentsMargins(0, 0, 0, 0)
+    v2_layout.setContentsMargins(0, 0, 0, 0) 
     v2_layout.setAlignment(Qt.AlignTop) 
 
     label_v2 = QLabel("Object Detection Algoritm Type 2")
