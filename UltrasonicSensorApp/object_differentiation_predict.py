@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model
 
-from FftSignalProcess import (
+from object_differentiation_signal_process import (
     FftSignal,
     getFFTSignalFreqDomainFeatures,
     getFFTSignalParameters,

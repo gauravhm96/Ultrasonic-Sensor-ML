@@ -7,7 +7,7 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers, models
 
-from FftSignalProcess import (
+from object_differentiation_signal_process import (
     FftSignal,
     getFFTSignalFreqDomainFeatures,
     getFFTSignalParameters,

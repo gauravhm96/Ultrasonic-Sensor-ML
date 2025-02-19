@@ -2,29 +2,19 @@ import sys
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QPushButton,
-    QSizePolicy,
-    QSpacerItem,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPushButton,
+                             QSizePolicy, QSpacerItem, QTabWidget, QTextEdit,
+                             QVBoxLayout, QWidget)
 
-from distanceML import distanceMLFeatureExtract
-from object_differentiation_tab import object_differentiation_features
 from object_detection_tab import object_detection_features
+from object_differentiation_tab import object_differentiation_features
+from ultrasonic_red_pitaya_connect import connect_to_red_pitaya
 
-
-class SettingsWindow(QMainWindow):
+class SensorGUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Settings")
-        self.setMinimumSize(1500, 1000)
+        self.setWindowTitle("Ultrasonic Sensor Application")
+        self.setMinimumSize(1600, 1500)
 
         # Create a central widget and a vertical layout
         central_widget = QWidget()
@@ -54,12 +44,12 @@ class SettingsWindow(QMainWindow):
         self.output_box.setStyleSheet(
             "background-color: white; border: 1px solid gray; font-size: 18px; padding: 5px;"
         )
-        self.output_box.setFixedHeight(250)  # Adjust height as needed
+        self.output_box.setFixedHeight(250)  
 
         # Add tabs to the tab widget
         tab_widget.addTab(self.Object_Differentiation(), "Object Differentiation")
         tab_widget.addTab(self.Object_Detection(), "Object Detection")
-        tab_widget.addTab(self.advanced_tab(), "Advanced")
+        tab_widget.addTab(self.advanced_tab(), "Connect To Red Pitaya")
         tab_widget.addTab(self.about_tab(), "About")
         # tab_widget.addTab(self.ML_tab(), "ML Tab")
 
@@ -68,16 +58,16 @@ class SettingsWindow(QMainWindow):
         button_layout.setContentsMargins(10, 10, 10, 10)
         button_layout.setSpacing(20)
 
-        ok_button = QPushButton("OK")
+        clearlogs_button = QPushButton("Clear Logs")
         cancel_button = QPushButton("Cancel")
         exit_button = QPushButton("Exit")
 
         # Set styles and size for buttons
-        for button in [ok_button, cancel_button, exit_button]:
+        for button in [clearlogs_button, cancel_button, exit_button]:
             button.setFixedSize(100, 40)
 
         # Add functionality to buttons
-        ok_button.clicked.connect(self.ok_action)
+        clearlogs_button.clicked.connect(self.clearlogs_action)
         cancel_button.clicked.connect(self.cancel_action)
         exit_button.clicked.connect(self.close)
 
@@ -85,7 +75,7 @@ class SettingsWindow(QMainWindow):
         button_layout.addSpacerItem(
             QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         )
-        button_layout.addWidget(ok_button)
+        button_layout.addWidget(clearlogs_button)
         button_layout.addWidget(cancel_button)
         button_layout.addWidget(exit_button)
 
@@ -99,94 +89,65 @@ class SettingsWindow(QMainWindow):
         central_widget.setLayout(central_layout)
         self.setCentralWidget(central_widget)
 
-    def ok_action(self):
-        """Handle OK button click."""
-        self.output_box.append("OK button clicked.")
-        print("OK button clicked.")
-
-    def cancel_action(self):
-        """Handle Cancel button click."""
-        sys.exit("Program terminated by user.")
-
-    def ML_tab(self):
-
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        label = QLabel("Machine Learning")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
-
-        layout.addWidget(label)
-
-        # Call the function from features.py to add more features
-        distanceMLFeatureExtract(layout, self.output_box)
-
-        layout.addStretch()  # Push contents to the top
-
-        tab.setLayout(layout)
-        return tab
-
-    def advanced_tab(self):
-        """Create the Advanced tab."""
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        label = QLabel("Advanced Settings")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
-
-        example_button = QPushButton("Configure Environment Variables")
-        example_button.setStyleSheet(
-            "background-color: lightgray; padding: 10px; font-size: 14px;"
-        )
-
-        layout.addWidget(label)
-        layout.addWidget(example_button)
-        layout.addStretch()  # Push contents to the top
-        tab.setLayout(layout)
-        return tab
-    
     def Object_Differentiation(self):
         tab = QWidget()
         layout = QVBoxLayout()
 
         label = QLabel("Object Differentiation")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;padding: 5px;")
 
         layout.addWidget(label)
-        
+
         object_differentiation_features(layout, self.output_box)
-        
+
         layout.addStretch()  # Push contents to the top
         tab.setLayout(layout)
         return tab
-    
+
     def Object_Detection(self):
         tab = QWidget()
         layout = QVBoxLayout()
 
         label = QLabel("Object Detection")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;padding: 5px;")
 
         layout.addWidget(label)
-        
+
         object_detection_features(layout, self.output_box)
-        
+
         layout.addStretch()  # Push contents to the top
         tab.setLayout(layout)
         return tab
+    
+    def advanced_tab(self):
+        """Create the Advanced tab."""
+        tab = QWidget()
+        layout = QVBoxLayout()
 
+        label = QLabel("Advanced Operations")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;padding: 5px;")
+
+        layout.addWidget(label)
+        
+        connect_to_red_pitaya(layout, self.output_box)
+
+        layout.addStretch()   
+        tab.setLayout(layout)
+        return tab
+        
     def about_tab(self):
         """Create the About tab."""
         tab = QWidget()
         layout = QVBoxLayout()
 
-        label = QLabel("About This Application")
-        label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        label = QLabel("About Ultrasonic App")
+        label.setStyleSheet("font-size: 18px; font-weight: bold;padding: 5px;")
 
         description = QLabel(
             "This is a sample settings application created using PyQt5.\n\nVersion: 1.0"
         )
-        description.setStyleSheet("font-size: 14px;")
+        description.setStyleSheet("font-size: 18px; font-weight: normal;padding: 5px")
+        
         description.setWordWrap(True)
 
         layout.addWidget(label)
@@ -195,6 +156,9 @@ class SettingsWindow(QMainWindow):
         tab.setLayout(layout)
         return tab
     
+    def clearlogs_action(self):
+        self.output_box.clear()
 
-
-
+    def cancel_action(self):
+        """Handle Cancel button click."""
+        sys.exit("Program terminated by user.")
