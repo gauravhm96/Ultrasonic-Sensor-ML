@@ -14,7 +14,7 @@ class SensorGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Ultrasonic Sensor Application")
-        self.setMinimumSize(1600, 1500)
+        self.setMinimumSize(1200, 1500)
 
         # Create a central widget and a vertical layout
         central_widget = QWidget()
