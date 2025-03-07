@@ -100,9 +100,9 @@ class ADCSignalProcess:
         data = data.to_numpy()
         N = data.shape[1]
 
-        # Compute the FFT for each measurement (each row) using real FFT (rfft)
+        # Compute the FFT for each measurement (each row) using real FFT (rfft) np.abs
         fft_results = np.apply_along_axis(np.fft.rfft, 1, data)
-        fft_magnitude = np.abs(fft_results)
+        fft_magnitude = (fft_results)
 
         avg_fft_magnitude = np.mean(fft_magnitude, axis=0)
 
@@ -394,7 +394,7 @@ class PredictADC:
 if __name__ == "__main__":
     # folder_path = 'C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/Machine Learning/fft_data/Soft/fft_Me.txt'
 
-    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_100.txt"
+    FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/adc_200.txt"
     FOLDER_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Raw_Data/"
     
     OUTPUT_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Test/adc_120.txt"
@@ -513,35 +513,35 @@ if __name__ == "__main__":
         
     # combined_df = pd.concat(dfs, ignore_index=True)
     
-    MODEL_FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Model/peak_classifier_model2.pkl"
+    # MODEL_FILE_PATH = "C:/@DevDocs/Projects/Mine/New folder/Ultrasonic-Sensor-ML/UltrasonicSensorApp/Model/peak_classifier_model2.pkl"
     
-    # trained_model = train.peaks_model(combined_df)
+    # # trained_model = train.peaks_model(combined_df)
     
-    # joblib.dump(trained_model, MODEL_FILE_PATH)
+    # # joblib.dump(trained_model, MODEL_FILE_PATH)
     
-    loaded_model = joblib.load(MODEL_FILE_PATH)
+    # loaded_model = joblib.load(MODEL_FILE_PATH)
 
-    df_features = df_features.copy()
-    df_features["distance"] = 0.0
-    feature_columns = ['candidate_peak_index', 'amplitude', 'prominence', 'distance']   
-    df_features["predicted_label"] = loaded_model.predict(df_features[feature_columns])
+    # df_features = df_features.copy()
+    # df_features["distance"] = 0.0
+    # feature_columns = ['candidate_peak_index', 'amplitude', 'prominence', 'distance']   
+    # df_features["predicted_label"] = loaded_model.predict(df_features[feature_columns])
 
-    df_first_echo = predictdata.identify_first_echo(df_features)
+    # df_first_echo = predictdata.identify_first_echo(df_features)
 
-    predicted_peaks = df_features[df_features["predicted_label"] == 1].copy()
+    # predicted_peaks = df_features[df_features["predicted_label"] == 1].copy()
 
-    # Check if any predicted peaks exist
-    if not predicted_peaks.empty:
-        # Find the row with the maximum amplitude among predicted peaks
-        max_peak_row = predicted_peaks.loc[predicted_peaks["amplitude"].idxmax()]
+    # # Check if any predicted peaks exist
+    # if not predicted_peaks.empty:
+    #     # Find the row with the maximum amplitude among predicted peaks
+    #     max_peak_row = predicted_peaks.loc[predicted_peaks["amplitude"].idxmax()]
 
-        highest_peak_index = max_peak_row["candidate_peak_index"]
-        highest_peak_amplitude = max_peak_row["amplitude"]
+    #     highest_peak_index = max_peak_row["candidate_peak_index"]
+    #     highest_peak_amplitude = max_peak_row["amplitude"]
 
-        print("Highest Predicted Peak Index:", highest_peak_index)
-        print("Highest Predicted Peak Amplitude:", highest_peak_amplitude)
-    else:
-        print("No predicted peaks were found.")
+    #     print("Highest Predicted Peak Index:", highest_peak_index)
+    #     print("Highest Predicted Peak Amplitude:", highest_peak_amplitude)
+    # else:
+    #     print("No predicted peaks were found.")
 
 
     

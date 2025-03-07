@@ -648,12 +648,13 @@ def object_differentiation_features(layout, output_box):
             validation_split=0.2,
             callbacks=[early_stopping, lr_scheduler, ProgressBarCallback()],
         )
-
+        
         # Step 9: Evaluate the model
         test_loss, test_accuracy = model.evaluate(X_test, y_test)
         output_box.append(f"Model Test Loss: {test_loss:.4f}")
         output_box.append(f"Model Test Accuracy: {test_accuracy * 100:.2f}%")
         output_box.append("Model Successfully Trained...!!!")
+        progress_bar.setValue(100)
 
     def plot_model():
         global folder_path, model, history
