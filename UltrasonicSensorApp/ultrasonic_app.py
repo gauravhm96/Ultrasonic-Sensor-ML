@@ -1,4 +1,5 @@
 import sys
+import os
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
@@ -22,7 +23,8 @@ class SensorGUI(QMainWindow):
 
         # Add a logo at the top
         logo_label = QLabel()
-        logo_path = r"C:\@DevDocs\Projects\Mine\New folder\Ultrasonic-Sensor-ML\UltrasonicSensorApp\Logo\image(1).png"
+        cwd = os.getcwd()
+        logo_path = os.path.join(cwd, "Logo", "image(1).png")
         logo_pixmap = QPixmap(logo_path)
         if not logo_pixmap.isNull():
             print("Logo loaded successfully.")

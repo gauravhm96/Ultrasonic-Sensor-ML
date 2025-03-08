@@ -21,6 +21,9 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 
+import os
+import datetime
+
 # Global variables for UDP client management:
 global udp_thread
 udp_thread = None
@@ -32,6 +35,12 @@ fft_running = False
 # Global variables for plotting
 XValues = None
 FFT_MIN_FREQUENCY = 35000  # from FFTConfig.MinFrequency
+
+# Global variables for Saving FFT Data
+global SAVE_HEADER
+SAVE_FILE = "fft_log.txt"  # default log file
+logging_active = False
+save_streams_count = 0
 
 class UDPClientThread(QThread):
     # Signal to emit incoming UDP data (as bytes)
@@ -141,6 +150,7 @@ def connect_to_red_pitaya(layout, output_box):
     sr_layout.setColumnStretch(0, 1)
     sr_layout.setColumnStretch(1, 2)
 
+    # Row 0: FFT Window controls
     fftwindow_label = QLabel("FFT Window Width:")
     fftwindow_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
     fftwindow_input = QComboBox()
@@ -148,21 +158,22 @@ def connect_to_red_pitaya(layout, output_box):
     fft_values = ["1024", "2048", "4096", "8192"]
     fftwindow_input.addItems(fft_values)
     fftwindow_input.setCurrentText("8192")
+    sr_layout.addWidget(fftwindow_label, 0, 0)
+    sr_layout.addWidget(fftwindow_input, 0, 1)
 
-    measurements_label = QLabel("measurements:")
+    # Row 1: Measurements and Buttons
+    row1_layout = QHBoxLayout()
+    row1_layout.setSpacing(10)
+    row1_layout.setContentsMargins(0, 0, 0, 0)
+    row1_layout.setAlignment(Qt.AlignLeft)
+
+    measurements_label = QLabel("Readings:")
     measurements_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
     measurements_input = QSpinBox()
-    measurements_input.setValue(5)
-
-    measure_count_label = QLabel("measure count:")
-    measure_count_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
-    measure_count_value = QLabel("0")
-
-    # Buttons in a horizontal layout (all in one row)
-    button_h_layout = QHBoxLayout()
-    button_h_layout.setSpacing(10)
-    button_h_layout.setContentsMargins(0, 0, 0, 0)
-    button_h_layout.setAlignment(Qt.AlignLeft)
+    measurements_input.setMinimumWidth(80)
+    measurements_input.setRange(1, 9999)
+    measurements_input.setValue(100)
+    measurements_input.setStyleSheet("font-size: 18px;")
 
     start_logging_button = QPushButton("start logging")
     start_logging_button.setStyleSheet("font-size: 18px; padding: 5px;")
@@ -173,21 +184,14 @@ def connect_to_red_pitaya(layout, output_box):
     start_fft_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_fft_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-    clear_rx_button = QPushButton("clear RX")
-    clear_rx_button.setStyleSheet("font-size: 18px; padding: 5px;")
-    clear_rx_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-    button_h_layout.addWidget(start_logging_button)
-    button_h_layout.addWidget(start_fft_button)
-    button_h_layout.addWidget(clear_rx_button)
+    row1_layout.addWidget(measurements_label)
+    row1_layout.addWidget(measurements_input)
+    row1_layout.addWidget(start_logging_button)
+    row1_layout.addWidget(start_fft_button)
 
     sr_layout.addWidget(fftwindow_label, 0, 0)
     sr_layout.addWidget(fftwindow_input, 0, 1)
-    sr_layout.addLayout(button_h_layout, 1, 0, 1, 2)
-    sr_layout.addWidget(measurements_label, 2, 0)
-    sr_layout.addWidget(measurements_input, 2, 1)
-    sr_layout.addWidget(measure_count_label, 3, 0)
-    sr_layout.addWidget(measure_count_value, 3, 1)
+    sr_layout.addLayout(row1_layout, 1, 0, 1, 2)
 
     sr_group.setLayout(sr_layout)
     left_v_layout.addWidget(sr_group)
@@ -272,8 +276,12 @@ def connect_to_red_pitaya(layout, output_box):
         return None, None
 
     def process_udp_data(data):
-        #output_box.append("Received UDP data: " + str(data))
+        global logging_active, save_streams_count,SAVE_FILE,SAVE_HEADER
         header_buf, data_buf = process_udp_message(data)
+        FFT_MinFrequencyIndex = 293
+        FFT_MaxFrequencyIndex = 377
+        FFT_FrequencyFactor = (125e6 / 64) / (2**14)  # Approximately 119.2093
+
         if header_buf is not None:
            output_box.append(f"Received header ({len(header_buf)} bytes) and data ({len(data_buf)} bytes)")
            new_canvas = create_series(data_buf, header_buf)
@@ -282,22 +290,57 @@ def connect_to_red_pitaya(layout, output_box):
                 if child.widget():
                      child.widget().deleteLater()
            data_layout.addWidget(new_canvas)
+
+           if logging_active:
+              
+              if not os.path.exists(SAVE_FILE):
+                freq_line = ""
+                for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
+                    freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
+                freq_line = freq_line.rstrip("\t") + "\n"  
+
+                if len(header_buf) >= 64:
+                    header_vals = struct.unpack('16f', header_buf[:64])
+                    header_line = "\t".join(str(int(val)) for val in header_vals)
+                else:
+                    header_line = "Header Error\n"
+                SAVE_HEADER = header_line
+                try:
+                    with open(SAVE_FILE, "w") as f:
+                        f.write(freq_line)
+                    output_box.append(f"Header written to {SAVE_FILE}")
+                except Exception as e:
+                    output_box.append(f"Error writing header: {e}")
+            
+                
+              # Convert the data buffer to an array of int16 values (Y values)
+              YValues = np.frombuffer(data_buf, dtype=np.int16)
+              line = "\t".join(str(val) for val in YValues)
+              full_line = SAVE_HEADER + "\t" + line + "\n"     
+              try:
+                 with open(SAVE_FILE, "a") as f:
+                    f.write(full_line)
+                 output_box.append("Logged FFT data samples.")
+              except Exception as e:
+                output_box.append(f"Error logging data: {e}")
+
+              save_streams_count -= 1
+              if save_streams_count <= 0:
+                 logging_active = False
+                 start_logging_button.setEnabled(True)
+                 output_box.append("Logging completed.")
+                 UDPSendData("-f 0")      
+                 start_fft_button.setText("start FFT")
+                 output_box.append("Stopping FFT process...")
         else:
             output_box.append("Received UDP data (unparsed): " + str(data))
-
-
 
     # ------------- Change FFT Window -------------
     def fft_window_width(index):
         # Check if the UDP client is active (for example, if udp_socket is not None)
         if udp_socket is not None:
-            # Create the command string. Here we use the index, as in the C# code.
             cmd = "-w " + str(index)
             UDPSendData(cmd)
-            # If you need to send to two sensors, you could call UDPSendData twice with different parameters.
-            # For example:
-            # UDPSendData(cmd, sensor_number=0)
-            # UDPSendData(cmd, sensor_number=1)
             output_box.append(f"FFT window width changed; sent command: {cmd}")
     # ------------- Plot FFT Data -------------
     def create_series(data_buf, header_buf):
@@ -442,7 +485,27 @@ def connect_to_red_pitaya(layout, output_box):
             UDPSendData("-f 0")
 
     def start_logging():
-        output_box.append("Starting logging (dummy).")
+        global logging_active, save_streams_count,SAVE_FILE
+        if not logging_active:
+           logging_active = True
+
+           cwd = os.getcwd()
+           logs_folder = os.path.join(cwd, "SensorUIApp - Logs")
+           if not os.path.exists(logs_folder):
+               os.makedirs(logs_folder)
+           now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+           filename = f"FFT_readings_{now_str}.txt"
+
+           SAVE_FILE = os.path.join(logs_folder, filename)
+
+           # Disable the button so the user cannot press it again until logging is done.
+           start_logging_button.setEnabled(False)
+           # Use the value from measurements_input as the counter
+           save_streams_count = measurements_input.value()
+           output_box.append(f"Logging started. Will log {save_streams_count} data sets.")
+        else:
+            output_box.append("Logging is already in progress.")
+
 
     def clear_rx():
         output_box.append("Clearing RX buffer (dummy).")
@@ -455,4 +518,3 @@ def connect_to_red_pitaya(layout, output_box):
     start_fft_button.toggled.connect(lambda state: start_fft(state))
     fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
-    clear_rx_button.clicked.connect(clear_rx)
