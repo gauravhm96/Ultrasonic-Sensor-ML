@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QTextEdit,
     QFrame,
-    QSizePolicy
+    QSizePolicy,
+    QComboBox
 )
 from PyQt5.QtCore import Qt,QThread, pyqtSignal
 import socket
@@ -142,9 +143,11 @@ def connect_to_red_pitaya(layout, output_box):
 
     fftwindow_label = QLabel("FFT Window Width:")
     fftwindow_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
-    fftwindow_input = QSpinBox()
-    fftwindow_input.setRange(1, 99999)
-    fftwindow_input.setValue(8192)
+    fftwindow_input = QComboBox()
+    fftwindow_input.setStyleSheet("font-size: 18px;")
+    fft_values = ["1024", "2048", "4096", "8192"]
+    fftwindow_input.addItems(fft_values)
+    fftwindow_input.setCurrentText("8192")
 
     measurements_label = QLabel("measurements:")
     measurements_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
@@ -282,6 +285,20 @@ def connect_to_red_pitaya(layout, output_box):
         else:
             output_box.append("Received UDP data (unparsed): " + str(data))
 
+
+
+    # ------------- Change FFT Window -------------
+    def fft_window_width(index):
+        # Check if the UDP client is active (for example, if udp_socket is not None)
+        if udp_socket is not None:
+            # Create the command string. Here we use the index, as in the C# code.
+            cmd = "-w " + str(index)
+            UDPSendData(cmd)
+            # If you need to send to two sensors, you could call UDPSendData twice with different parameters.
+            # For example:
+            # UDPSendData(cmd, sensor_number=0)
+            # UDPSendData(cmd, sensor_number=1)
+            output_box.append(f"FFT window width changed; sent command: {cmd}")
     # ------------- Plot FFT Data -------------
     def create_series(data_buf, header_buf):
         """
@@ -291,6 +308,10 @@ def connect_to_red_pitaya(layout, output_box):
         - Returns a matplotlib FigureCanvas with the plotted data.
         """
         global XValues
+        FFT_MIN_FREQUENCY = 35000
+        FFT_MAX_FREQUENCY = 45000
+        Y_MIN = 0
+        Y_MAX = 1000
         # Compute the number of samples (each sample is 2 bytes)
         DataLength = len(data_buf) // 2
         
@@ -313,10 +334,11 @@ def connect_to_red_pitaya(layout, output_box):
         fig = plt.figure(figsize=(8, 4))
         ax = fig.add_subplot(111)
         ax.plot(XValues, YValues, linestyle='-', marker='o')
+        ax.set_xlim(FFT_MIN_FREQUENCY, FFT_MAX_FREQUENCY)
+        ax.set_ylim(Y_MIN, Y_MAX)
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("Amplitude")
-        ax.set_title("FFT Data")
-        ax.grid(True)
         
         # Create a FigureCanvas and return it
         canvas = FigureCanvas(fig)
@@ -431,5 +453,6 @@ def connect_to_red_pitaya(layout, output_box):
     start_client_button.toggled.connect(lambda state: start_client())
     start_fft_button.setCheckable(True)
     start_fft_button.toggled.connect(lambda state: start_fft(state))
+    fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
     clear_rx_button.clicked.connect(clear_rx)
