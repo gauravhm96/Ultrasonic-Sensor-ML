@@ -33,8 +33,10 @@ udp_thread_running = False
 fft_running = False
 
 # Global variables for plotting
+fft_canvas = None
 XValues = None
 FFT_MIN_FREQUENCY = 35000  # from FFTConfig.MinFrequency
+
 
 # Global variables for Saving FFT Data
 global SAVE_HEADER
@@ -229,10 +231,6 @@ def connect_to_red_pitaya(layout, output_box):
     data_layout.setSpacing(5)
     data_layout.setContentsMargins(5, 5, 5, 5)
 
-    placeholder = QLabel()
-    placeholder.setAlignment(Qt.AlignCenter)
-    data_layout.addWidget(placeholder)
-
     data_display = QTextEdit()
     data_display.setReadOnly(True)
     data_display.setStyleSheet("background-color: #ffffff; font-size: 14px;")
@@ -284,12 +282,7 @@ def connect_to_red_pitaya(layout, output_box):
 
         if header_buf is not None:
            output_box.append(f"Received header ({len(header_buf)} bytes) and data ({len(data_buf)} bytes)")
-           new_canvas = create_series(data_buf, header_buf)
-           while data_layout.count():
-                child = data_layout.takeAt(0)
-                if child.widget():
-                     child.widget().deleteLater()
-           data_layout.addWidget(new_canvas)
+           create_series(data_buf, header_buf)
 
            if logging_active:
               
@@ -343,6 +336,13 @@ def connect_to_red_pitaya(layout, output_box):
             UDPSendData(cmd)
             output_box.append(f"FFT window width changed; sent command: {cmd}")
     # ------------- Plot FFT Data -------------
+    def Plot_fft():
+        fig = plt.figure(figsize=(8, 4))
+        ax = fig.add_subplot(111)
+        canvas = FigureCanvas(fig)
+        canvas.ax = ax  # Store axis reference for later updates
+        return canvas
+    
     def create_series(data_buf, header_buf):
         """
         - DataBuffer is interpreted as Int16 samples.
@@ -350,11 +350,11 @@ def connect_to_red_pitaya(layout, output_box):
         - X values are computed starting at FFT_MIN_FREQUENCY, using the frequency factor as increment.
         - Returns a matplotlib FigureCanvas with the plotted data.
         """
-        global XValues
+        global XValues,fft_canvas
         FFT_MIN_FREQUENCY = 35000
         FFT_MAX_FREQUENCY = 45000
         Y_MIN = 0
-        Y_MAX = 1000
+        Y_MAX = 1200
         # Compute the number of samples (each sample is 2 bytes)
         DataLength = len(data_buf) // 2
         
@@ -373,19 +373,21 @@ def connect_to_red_pitaya(layout, output_box):
         if XValues is None or len(XValues) != DataLength:
             XValues = np.array([FFT_MIN_FREQUENCY + i * x_interval for i in range(DataLength)], dtype=np.uint16)
         
-        # Create a matplotlib figure and plot the data
-        fig = plt.figure(figsize=(8, 4))
-        ax = fig.add_subplot(111)
-        ax.plot(XValues, YValues, linestyle='-', marker='o')
-        ax.set_xlim(FFT_MIN_FREQUENCY, FFT_MAX_FREQUENCY)
-        ax.set_ylim(Y_MIN, Y_MAX)
-        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax.set_xlabel("Frequency (Hz)")
-        ax.set_ylabel("Amplitude")
+        if fft_canvas is None:
+            fft_canvas = Plot_fft()
+            data_layout.addWidget(fft_canvas)
+            data_layout.removeWidget(data_display)
+            data_display.deleteLater()
+        else:
+            fft_canvas.ax.clear()
         
-        # Create a FigureCanvas and return it
-        canvas = FigureCanvas(fig)
-        return canvas
+        fft_canvas.ax.plot(XValues, YValues, linestyle='-', marker='o')
+        fft_canvas.ax.set_xlabel("Frequency (Hz)")
+        fft_canvas.ax.set_ylabel("Amplitude")
+        fft_canvas.ax.grid(True)
+        fft_canvas.ax.set_xlim(FFT_MIN_FREQUENCY, FFT_MAX_FREQUENCY)
+        fft_canvas.ax.set_ylim(Y_MIN, Y_MAX)
+        fft_canvas.draw()    
 
 
     # ------------- UDP PING HELPER FUNCTION -------------
