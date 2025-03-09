@@ -1322,12 +1322,10 @@ def object_detection_features(layout, output_box):
     def select_version1(checked):
         if checked:
             stacked_widget.setCurrentIndex(0)
-            output_box.append("Version 1 selected.")
 
     def select_version2(checked):
         if checked:
             stacked_widget.setCurrentIndex(1)
-            output_box.append("Version 2 selected.")
 
     radio_v1.toggled.connect(select_version1)
     radio_v2.toggled.connect(select_version2)

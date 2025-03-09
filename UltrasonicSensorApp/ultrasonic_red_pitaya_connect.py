@@ -45,6 +45,10 @@ SAVE_FILE = "fft_log.txt"  # default log file
 logging_active = False
 save_streams_count = 0
 
+# Global variables for ML
+MODEL_FILE = None
+ML_running = False
+
 class UDPClientThread(QThread):
     # Signal to emit incoming UDP data (as bytes)
     data_received = pyqtSignal(bytes)
@@ -219,6 +223,7 @@ def connect_to_red_pitaya(layout, output_box):
     select_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     start_predict_button = QPushButton("Start Predict")
+    start_predict_button.setCheckable(True)
     start_predict_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_predict_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -482,8 +487,9 @@ def connect_to_red_pitaya(layout, output_box):
 
     def start_client():
         global udp_thread, udp_socket, client_active
-            # Query the button's state explicitly:
+        # Query the button's state explicitly:
         if start_client_button.isChecked():
+           client_active = True
            start_client_button.setText("stop client")
            output_box.append("Starting UDP client...")
            # Get the local port from the widget
@@ -497,23 +503,29 @@ def connect_to_red_pitaya(layout, output_box):
         else:
            start_client_button.setText("start client")
            output_box.append("Stopping UDP client...")
+           client_active = False
            if udp_socket is not None:
               udp_socket.close()
               udp_socket = None
+              
            start_udp_thread(False)
     
 
     def start_fft(state):
-        global fft_running
+        global fft_running,client_active
         fft_running = state
-        if fft_running:
-            start_fft_button.setText("stop FFT")
-            output_box.append("Starting FFT process...")
-            UDPSendData("-f 1")
+        if client_active:
+            if fft_running:
+                start_fft_button.setText("stop FFT")
+                output_box.append("Starting FFT process...")
+                UDPSendData("-f 1")
+            else:
+                start_fft_button.setText("start FFT")
+                output_box.append("Stopping FFT process...")
+                UDPSendData("-f 0")
         else:
-            start_fft_button.setText("start FFT")
-            output_box.append("Stopping FFT process...")
-            UDPSendData("-f 0")
+            output_box.append("UDP Client not Started..!!")
+
 
     def start_logging():
         global logging_active, save_streams_count,SAVE_FILE
@@ -538,13 +550,30 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("Logging is already in progress.")
 
     def select_model():
-        file_path, _ = QFileDialog.getOpenFileName(None, "Select Model File", os.getcwd(), "H5 Files (*.h5)")
-        if file_path:
-            output_box.append(f"Model selected: {file_path}")
+        global MODEL_FILE
+        MODEL_FILE, _ = QFileDialog.getOpenFileName(None, "Select Model File", os.getcwd(), "H5 Files (*.h5)")
+        if MODEL_FILE:
+            output_box.append(f"Model selected: {MODEL_FILE}")
         else:
             output_box.append("No model file selected.")
-    def start_predict():
-        output_box.append("Starting prediction (dummy).")
+
+    def start_predict(state):
+        global MODEL_FILE,client_active,ML_running
+        ML_running = state
+        output_box.append(f"Model selected: {MODEL_FILE}")
+
+        if client_active:
+            if ML_running:
+                start_predict_button.setText("Stop Predict")
+                output_box.append("Starting Predict process...")
+                UDPSendData("-f 1")
+            else:
+                start_predict_button.setText("Start Predict")
+                output_box.append("Stopping Predict process...")
+                UDPSendData("-f 0")
+        else:
+            output_box.append("UDP Client not Started..!!")
+
 
     check_connection_button.clicked.connect(check_sensor_connection)
     start_sensor_button.clicked.connect(start_sensor)
@@ -555,4 +584,5 @@ def connect_to_red_pitaya(layout, output_box):
     fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
     select_model_button.clicked.connect(select_model)
-    start_predict_button.clicked.connect(start_predict)
+    start_predict_button.setCheckable(True)
+    start_predict_button.toggled.connect(lambda state: start_predict(state))
