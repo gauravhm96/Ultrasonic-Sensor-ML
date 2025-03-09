@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QFrame,
     QSizePolicy,
-    QComboBox
+    QComboBox,
+    QFileDialog
 )
 from PyQt5.QtCore import Qt,QThread, pyqtSignal
 import socket
@@ -70,6 +71,12 @@ class UDPClientThread(QThread):
 
 def connect_to_red_pitaya(layout, output_box):
     global udp_thread
+
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setFrameShadow(QFrame.Sunken)
+    line.setLineWidth(2)
+    layout.addWidget(line)
 
     # Main horizontal layout for the left config panel and right data display
     main_h_layout = QHBoxLayout()
@@ -197,6 +204,28 @@ def connect_to_red_pitaya(layout, output_box):
 
     sr_group.setLayout(sr_layout)
     left_v_layout.addWidget(sr_group)
+
+    # ------------------------- MACHINE LEARNING GROUP -------------------------
+    ml_group = QGroupBox("Machine Learning")
+    ml_group.setStyleSheet("font-size: 18px;")
+    ml_layout = QGridLayout()
+    ml_layout.setSpacing(5)
+    ml_layout.setContentsMargins(5, 5, 5, 5)
+    ml_layout.setColumnStretch(0, 1)
+    ml_layout.setColumnStretch(1, 2)
+
+    select_model_button = QPushButton("Select Model")
+    select_model_button.setStyleSheet("font-size: 18px; padding: 5px;")
+    select_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    start_predict_button = QPushButton("Start Predict")
+    start_predict_button.setStyleSheet("font-size: 18px; padding: 5px;")
+    start_predict_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    ml_layout.addWidget(select_model_button, 0, 0)
+    ml_layout.addWidget(start_predict_button, 0, 1)
+    ml_group.setLayout(ml_layout)
+    left_v_layout.addWidget(ml_group)
 
     # ------------------------- BOTTOM LEFT SENSOR STATUS (VERTICAL) -------------------------
     sensor_status_group = QGroupBox("Sensor Status")
@@ -508,9 +537,14 @@ def connect_to_red_pitaya(layout, output_box):
         else:
             output_box.append("Logging is already in progress.")
 
-
-    def clear_rx():
-        output_box.append("Clearing RX buffer (dummy).")
+    def select_model():
+        file_path, _ = QFileDialog.getOpenFileName(None, "Select Model File", os.getcwd(), "H5 Files (*.h5)")
+        if file_path:
+            output_box.append(f"Model selected: {file_path}")
+        else:
+            output_box.append("No model file selected.")
+    def start_predict():
+        output_box.append("Starting prediction (dummy).")
 
     check_connection_button.clicked.connect(check_sensor_connection)
     start_sensor_button.clicked.connect(start_sensor)
@@ -520,3 +554,5 @@ def connect_to_red_pitaya(layout, output_box):
     start_fft_button.toggled.connect(lambda state: start_fft(state))
     fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
+    select_model_button.clicked.connect(select_model)
+    start_predict_button.clicked.connect(start_predict)

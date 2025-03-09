@@ -5,11 +5,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPushButton,
                              QSizePolicy, QSpacerItem, QTabWidget, QTextEdit,
-                             QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget,QSplitter)
 
 from object_detection_tab import object_detection_features
 from object_differentiation_tab import object_differentiation_features
 from ultrasonic_red_pitaya_connect import connect_to_red_pitaya
+from about_tab import about_tab
 
 class SensorGUI(QMainWindow):
     def __init__(self):
@@ -39,23 +40,25 @@ class SensorGUI(QMainWindow):
         # Create a tab widget
         tab_widget = QTabWidget()
         tab_widget.setStyleSheet("QTabBar::tab { padding: 10px; }")
-
+        
         # Create a text output dialog box for logs
         self.output_box = QTextEdit()
         self.output_box.setReadOnly(True)  # Make it read-only
         self.output_box.setStyleSheet(
             "background-color: white; border: 1px solid gray; font-size: 18px; padding: 5px;"
         )
-        self.output_box.setFixedHeight(250)  
+        self.output_box.setMinimumHeight(150) 
+        self.output_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        vertical_splitter = QSplitter(Qt.Vertical)
 
         # Add tabs to the tab widget
         tab_widget.addTab(self.Object_Differentiation(), "Object Differentiation")
         tab_widget.addTab(self.Object_Detection(), "Object Detection")
         tab_widget.addTab(self.advanced_tab(), "Connect To Red Pitaya")
         tab_widget.addTab(self.about_tab(), "About")
-        # tab_widget.addTab(self.ML_tab(), "ML Tab")
 
-        # Add OK, Cancel, and Exit buttons at the bottom
+        # Add Clear Logs, Cancel, and Exit buttons at the bottom
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(10, 10, 10, 10)
         button_layout.setSpacing(20)
@@ -83,8 +86,9 @@ class SensorGUI(QMainWindow):
 
         # Add the logo, tab widget, output box, and buttons to the central layout
         central_layout.addWidget(logo_label)
-        central_layout.addWidget(tab_widget)
-        central_layout.addWidget(self.output_box)
+        vertical_splitter.addWidget(tab_widget)
+        vertical_splitter.addWidget(self.output_box)
+        central_layout.addWidget(vertical_splitter)
         central_layout.addLayout(button_layout)
 
         # Set the layout to the central widget
@@ -122,7 +126,6 @@ class SensorGUI(QMainWindow):
         return tab
     
     def advanced_tab(self):
-        """Create the Advanced tab."""
         tab = QWidget()
         layout = QVBoxLayout()
 
@@ -144,17 +147,11 @@ class SensorGUI(QMainWindow):
 
         label = QLabel("About Ultrasonic App")
         label.setStyleSheet("font-size: 18px; font-weight: bold;padding: 5px;")
-
-        description = QLabel(
-            "This is a sample settings application created using PyQt5.\n\nVersion: 1.0"
-        )
-        description.setStyleSheet("font-size: 18px; font-weight: normal;padding: 5px")
-        
-        description.setWordWrap(True)
-
         layout.addWidget(label)
-        layout.addWidget(description)
-        layout.addStretch()  # Push contents to the top
+
+        about_tab(layout, self.output_box)
+
+        layout.addStretch() 
         tab.setLayout(layout)
         return tab
     

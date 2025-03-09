@@ -59,6 +59,11 @@ def object_detection_features(layout, output_box):
     processadcdata = ADCSignalProcess()
     train = TrainADC()
     
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setFrameShadow(QFrame.Sunken)
+    line.setLineWidth(2)
+    layout.addWidget(line)
     
     # Create a horizontal layout for the version selection section
     detection_label = QLabel("Select version for Object Detection Algoritm")
