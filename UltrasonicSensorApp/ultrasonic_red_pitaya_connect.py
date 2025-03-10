@@ -3,7 +3,7 @@ import os
 import socket
 import struct
 import time
-
+import tempfile, os
 import matplotlib.pyplot as plt
 import numpy as np
 import paramiko
@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
 )
-
+from object_differentiation_predict import Predict_FFT
 # Global variables for UDP client management:
 global udp_thread
 udp_thread = None
@@ -51,6 +51,8 @@ save_streams_count = 0
 MODEL_FILE = None
 ML_running = False
 RealTimePredict = False
+predict_buffer = [] 
+MAX_PREDICT_MEASUREMENTS = 200
 
 
 class UDPClientThread(QThread):
@@ -302,7 +304,7 @@ def connect_to_red_pitaya(layout, output_box):
         try:
             # Send command using the existing socket
             udp_socket.sendto(cmd.encode("utf-8"), (ip, port))
-            output_box.append(f"Sent UDP command: {cmd}")
+            #output_box.append(f"Sent UDP command: {cmd}")
         except Exception as e:
             output_box.append(f"Error sending UDP command: {e}")
 
@@ -317,10 +319,101 @@ def connect_to_red_pitaya(layout, output_box):
                 data_buffer = data[header_length : header_length + data_length]
                 return header_buffer, data_buffer
         return None, None
+    
+    def log_fft_data(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor):
+        global SAVE_FILE, SAVE_HEADER, save_streams_count
+        if not os.path.exists(SAVE_FILE):
+            freq_line = ""
+            for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
+                freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
+            freq_line = freq_line.rstrip("\t") + "\n"
+
+            if len(header_buf) >= 64:
+                header_vals = struct.unpack("16f", header_buf[:64])
+                header_line = "\t".join(str(int(val)) for val in header_vals)
+            else:
+                header_line = "Header Error\n"
+            SAVE_HEADER = header_line
+            try:
+                with open(SAVE_FILE, "w") as f:
+                    f.write(freq_line)
+                    #output_box.append(f"Header written to {SAVE_FILE}")
+            except Exception as e:
+                    output_box.append(f"Error writing header: {e}")
+        # Convert the data buffer to an array of int16 values (Y values)
+        YValues = np.frombuffer(data_buf, dtype=np.int16)
+        line = "\t".join(str(val) for val in YValues)
+        full_line = SAVE_HEADER + "\t" + line + "\n"
+        try:
+           with open(SAVE_FILE, "a") as f:
+                f.write(full_line)
+        except Exception as e:
+                output_box.append(f"Error logging data: {e}")
+
+        save_streams_count -= 1
+        if save_streams_count <= 0:
+            logging_active = False
+            start_logging_button.setEnabled(True)
+            output_box.append("Logging completed...!!")
+            UDPSendData("-f 0")
+            start_fft_button.setText("start FFT")
+            output_box.append("Stopping FFT process...")
+    
+    def real_time_predict(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor):
+        global predict_buffer,MODEL_FILE,SAVE_HEADER
+        Predict = Predict_FFT()
+
+        if not predict_buffer:
+            freq_line = ""
+            for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
+                freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
+            freq_line = freq_line.rstrip("\t")
+
+            if len(header_buf) >= 64:
+                header_vals = struct.unpack("16f", header_buf[:64])
+                header_line = "\t".join(str(int(val)) for val in header_vals)
+            else:
+                header_line = "Header Error"
+            SAVE_HEADER = header_line
+            predict_buffer.append(freq_line)
+        
+        YValues = np.frombuffer(data_buf, dtype=np.int16)
+        measurement_line = "\t".join(str(val) for val in YValues)
+
+        full_line = SAVE_HEADER + "\t" + measurement_line + "\n"
+        predict_buffer.append(full_line)
+
+        if len(predict_buffer) - 1 >= MAX_PREDICT_MEASUREMENTS:
+            temp_file_content = "\n".join(predict_buffer)
+
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as temp_file:
+                temp_file.write(temp_file_content)
+                temp_file_path = temp_file.name
+                print(temp_file_path)
+                PredictPCA = Predict.loadpredictfile(temp_file_path)
+                UpdatedPredictPCA = PredictPCA.reshape(PredictPCA.shape[0], -1)
+                Loadcnnmodel = Predict.loadCNNModel(MODEL_FILE)
+                predictions = Loadcnnmodel.predict(UpdatedPredictPCA)
+                predicted_labels = (predictions > 0.5).astype(int)
+
+                for label in predicted_labels:
+                    if label == 0:
+                        print("Wear Seat Belt...!!")
+                    else:
+                        print("No Presence Detected..")
+            os.remove(temp_file_path)
+
+            if MODEL_FILE:
+                Loadcnnmodel = Predict.loadCNNModel(MODEL_FILE)
+            else:
+                output_box.append("Invalid Model or File..!!")
+
+            predict_buffer.clear()
+            output_box.append("Prediction completed; buffer cleared.")
+
 
     def process_udp_data(data):
         start_time = time.perf_counter()
-
         global logging_active, save_streams_count, SAVE_FILE, SAVE_HEADER, RealTimePredict
         header_buf, data_buf = process_udp_message(data)
         FFT_MinFrequencyIndex = 293
@@ -331,55 +424,16 @@ def connect_to_red_pitaya(layout, output_box):
             create_series(data_buf, header_buf)
 
             if logging_active:
-
-                if not os.path.exists(SAVE_FILE):
-                    freq_line = ""
-                    for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
-                        freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
-                    freq_line = freq_line.rstrip("\t") + "\n"
-
-                    if len(header_buf) >= 64:
-                        header_vals = struct.unpack("16f", header_buf[:64])
-                        header_line = "\t".join(str(int(val)) for val in header_vals)
-                    else:
-                        header_line = "Header Error\n"
-                    SAVE_HEADER = header_line
-                    try:
-                        with open(SAVE_FILE, "w") as f:
-                            f.write(freq_line)
-                        output_box.append(f"Header written to {SAVE_FILE}")
-                    except Exception as e:
-                        output_box.append(f"Error writing header: {e}")
-
-                # Convert the data buffer to an array of int16 values (Y values)
-                YValues = np.frombuffer(data_buf, dtype=np.int16)
-                line = "\t".join(str(val) for val in YValues)
-                full_line = SAVE_HEADER + "\t" + line + "\n"
-                try:
-                    with open(SAVE_FILE, "a") as f:
-                        f.write(full_line)
-                    output_box.append("Logged FFT data samples.")
-                except Exception as e:
-                    output_box.append(f"Error logging data: {e}")
-
-                save_streams_count -= 1
-                if save_streams_count <= 0:
-                    logging_active = False
-                    start_logging_button.setEnabled(True)
-                    output_box.append("Logging completed.")
-                    UDPSendData("-f 0")
-                    start_fft_button.setText("start FFT")
-                    output_box.append("Stopping FFT process...")
+                log_fft_data(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor)
             
             if RealTimePredict:
-                #TODO
-                output_box.append("TODO...")
-
+                real_time_predict(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor)
+    
         else:
             output_box.append("Received UDP data (unparsed): " + str(data))
         end_time = time.perf_counter()
         elapsed_time = end_time - start_time
-        print(f"process_udp_data execution time: {elapsed_time:.6f} seconds")
+        # print(f"process_udp_data execution time: {elapsed_time:.6f} seconds")
     # ------------- Change FFT Window -------------
     def fft_window_width(index):
         # Check if the UDP client is active (for example, if udp_socket is not None)
@@ -557,8 +611,8 @@ def connect_to_red_pitaya(layout, output_box):
             if client_active:
                 if fft_running:
                     start_fft_button.setText("stop FFT")
-                    output_box.append("Starting FFT process...")
                     UDPSendData("-f 1")
+                    output_box.append("Started FFT process...")
                 else:
                     start_fft_button.setText("start FFT")
                     output_box.append("Stopping FFT process...")
@@ -610,14 +664,20 @@ def connect_to_red_pitaya(layout, output_box):
 
         if sensor_active:
             ML_running = state
-            output_box.append(f"Model selected: {MODEL_FILE}")
 
             if client_active:
                 if ML_running:
-                    start_predict_button.setText("Stop Predict")
-                    output_box.append("Starting Predict process...")
-                    UDPSendData("-f 1")
-                    RealTimePredict = True
+                    if MODEL_FILE:
+                        output_box.append(f"Model selected: {MODEL_FILE}")
+                        start_predict_button.setText("Stop Predict")
+                        UDPSendData("-f 1")
+                        output_box.append("Started Predict process...")
+                        RealTimePredict = True
+                    else:
+                        start_predict_button.setText("Start Predict")
+                        output_box.append("No Predicting Model Selected...")
+                        UDPSendData("-f 0")
+                        RealTimePredict = False
                 else:
                     start_predict_button.setText("Start Predict")
                     output_box.append("Stopping Predict process...")
