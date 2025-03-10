@@ -1,29 +1,30 @@
+import datetime
+import os
+import socket
+import struct
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+import paramiko
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from ping3 import ping
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
+    QComboBox,
+    QFileDialog,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
-    QTextEdit,
-    QFrame,
+    QLabel,
+    QLineEdit,
+    QPushButton,
     QSizePolicy,
-    QComboBox,
-    QFileDialog
+    QSpinBox,
+    QTextEdit,
+    QVBoxLayout,
 )
-from PyQt5.QtCore import Qt,QThread, pyqtSignal
-import socket
-from ping3 import ping 
-import paramiko
-import struct
-import numpy as np
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.pyplot as plt
-
-import os
-import datetime
 
 # Global variables for UDP client management:
 global udp_thread
@@ -49,6 +50,8 @@ save_streams_count = 0
 # Global variables for ML
 MODEL_FILE = None
 ML_running = False
+RealTimePredict = False
+
 
 class UDPClientThread(QThread):
     # Signal to emit incoming UDP data (as bytes)
@@ -70,9 +73,11 @@ class UDPClientThread(QThread):
             except Exception as e:
                 print("UDP error:", e)
                 break
+
     def stop(self):
         self.running = False
         self.wait()
+
 
 def connect_to_red_pitaya(layout, output_box):
     global udp_thread
@@ -105,7 +110,9 @@ def connect_to_red_pitaya(layout, output_box):
     sensor_ip_input_1 = QLineEdit("192.168.128.1")
 
     sensor_ip_port_label = QLabel("Sensor IP port:")
-    sensor_ip_port_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    sensor_ip_port_label.setStyleSheet(
+        "font-size: 18px; font-weight: bold; padding: 5px;"
+    )
     sensor_ip_port_input = QSpinBox()
     sensor_ip_port_input.setRange(1, 65535)
     sensor_ip_port_input.setValue(61231)
@@ -115,7 +122,9 @@ def connect_to_red_pitaya(layout, output_box):
     local_ip_input_1 = QLineEdit("127.0.0.1")
 
     local_ip_port_label = QLabel("Local IP port:")
-    local_ip_port_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    local_ip_port_label.setStyleSheet(
+        "font-size: 18px; font-weight: bold; padding: 5px;"
+    )
     local_ip_port_input = QSpinBox()
     local_ip_port_input.setRange(1, 65535)
     local_ip_port_input.setValue(61231)
@@ -151,7 +160,7 @@ def connect_to_red_pitaya(layout, output_box):
     udp_layout.addWidget(local_ip_port_label, 3, 0)
     udp_layout.addWidget(local_ip_port_input, 3, 1)
     udp_layout.addLayout(button_h_layout, 4, 0, 1, 2)
-    
+
     udp_group.setLayout(udp_layout)
     left_v_layout.addWidget(udp_group)
 
@@ -182,7 +191,9 @@ def connect_to_red_pitaya(layout, output_box):
     row1_layout.setAlignment(Qt.AlignLeft)
 
     measurements_label = QLabel("Readings:")
-    measurements_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px;")
+    measurements_label.setStyleSheet(
+        "font-size: 18px; font-weight: bold; padding: 5px;"
+    )
     measurements_input = QSpinBox()
     measurements_input.setMinimumWidth(80)
     measurements_input.setRange(1, 9999)
@@ -194,6 +205,7 @@ def connect_to_red_pitaya(layout, output_box):
     start_logging_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     start_fft_button = QPushButton("start FFT")
+    start_fft_button.setCheckable(True)
     start_fft_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_fft_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -223,6 +235,7 @@ def connect_to_red_pitaya(layout, output_box):
     select_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     start_predict_button = QPushButton("Start Predict")
+    start_predict_button.setCheckable(True)
     start_predict_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_predict_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -275,7 +288,6 @@ def connect_to_red_pitaya(layout, output_box):
     main_h_layout.addWidget(data_group, 2)
     layout.addLayout(main_h_layout)
 
-
     def UDPSendData(cmd):
         """
         Sends a UDP command to the sensor.
@@ -283,13 +295,13 @@ def connect_to_red_pitaya(layout, output_box):
         """
         ip = sensor_ip_input_1.text().strip()
         port = sensor_ip_port_input.value()
-        global udp_socket    
+        global udp_socket
         if udp_socket is None:
-           output_box.append("UDP socket not initialized!")
-           return
+            output_box.append("UDP socket not initialized!")
+            return
         try:
             # Send command using the existing socket
-            udp_socket.sendto(cmd.encode('utf-8'), (ip, port))
+            udp_socket.sendto(cmd.encode("utf-8"), (ip, port))
             output_box.append(f"Sent UDP command: {cmd}")
         except Exception as e:
             output_box.append(f"Error sending UDP command: {e}")
@@ -297,70 +309,77 @@ def connect_to_red_pitaya(layout, output_box):
     # --- Define a slot to process incoming UDP data ---
     def process_udp_message(data):
         if len(data) >= 8:  # At least two floats for header and data length
-            header_length, data_length = struct.unpack('ff', data[:8])
+            header_length, data_length = struct.unpack("ff", data[:8])
             header_length = int(header_length)
             data_length = int(data_length)
             if len(data) >= header_length + data_length:
                 header_buffer = data[:header_length]
-                data_buffer = data[header_length:header_length+data_length]
+                data_buffer = data[header_length : header_length + data_length]
                 return header_buffer, data_buffer
         return None, None
 
     def process_udp_data(data):
-        global logging_active, save_streams_count,SAVE_FILE,SAVE_HEADER
+        start_time = time.perf_counter()
+
+        global logging_active, save_streams_count, SAVE_FILE, SAVE_HEADER, RealTimePredict
         header_buf, data_buf = process_udp_message(data)
         FFT_MinFrequencyIndex = 293
         FFT_MaxFrequencyIndex = 377
         FFT_FrequencyFactor = (125e6 / 64) / (2**14)  # Approximately 119.2093
 
         if header_buf is not None:
-           output_box.append(f"Received header ({len(header_buf)} bytes) and data ({len(data_buf)} bytes)")
-           create_series(data_buf, header_buf)
+            create_series(data_buf, header_buf)
 
-           if logging_active:
-              
-              if not os.path.exists(SAVE_FILE):
-                freq_line = ""
-                for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
-                    freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
-                freq_line = freq_line.rstrip("\t") + "\n"  
+            if logging_active:
 
-                if len(header_buf) >= 64:
-                    header_vals = struct.unpack('16f', header_buf[:64])
-                    header_line = "\t".join(str(int(val)) for val in header_vals)
-                else:
-                    header_line = "Header Error\n"
-                SAVE_HEADER = header_line
+                if not os.path.exists(SAVE_FILE):
+                    freq_line = ""
+                    for ix in range(FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex + 1):
+                        freq_line += f"{ix * FFT_FrequencyFactor:.0f}\t"
+                    freq_line = freq_line.rstrip("\t") + "\n"
+
+                    if len(header_buf) >= 64:
+                        header_vals = struct.unpack("16f", header_buf[:64])
+                        header_line = "\t".join(str(int(val)) for val in header_vals)
+                    else:
+                        header_line = "Header Error\n"
+                    SAVE_HEADER = header_line
+                    try:
+                        with open(SAVE_FILE, "w") as f:
+                            f.write(freq_line)
+                        output_box.append(f"Header written to {SAVE_FILE}")
+                    except Exception as e:
+                        output_box.append(f"Error writing header: {e}")
+
+                # Convert the data buffer to an array of int16 values (Y values)
+                YValues = np.frombuffer(data_buf, dtype=np.int16)
+                line = "\t".join(str(val) for val in YValues)
+                full_line = SAVE_HEADER + "\t" + line + "\n"
                 try:
-                    with open(SAVE_FILE, "w") as f:
-                        f.write(freq_line)
-                    output_box.append(f"Header written to {SAVE_FILE}")
+                    with open(SAVE_FILE, "a") as f:
+                        f.write(full_line)
+                    output_box.append("Logged FFT data samples.")
                 except Exception as e:
-                    output_box.append(f"Error writing header: {e}")
-            
-                
-              # Convert the data buffer to an array of int16 values (Y values)
-              YValues = np.frombuffer(data_buf, dtype=np.int16)
-              line = "\t".join(str(val) for val in YValues)
-              full_line = SAVE_HEADER + "\t" + line + "\n"     
-              try:
-                 with open(SAVE_FILE, "a") as f:
-                    f.write(full_line)
-                 output_box.append("Logged FFT data samples.")
-              except Exception as e:
-                output_box.append(f"Error logging data: {e}")
+                    output_box.append(f"Error logging data: {e}")
 
-              save_streams_count -= 1
-              if save_streams_count <= 0:
-                 logging_active = False
-                 start_logging_button.setEnabled(True)
-                 output_box.append("Logging completed.")
-                 UDPSendData("-f 0")      
-                 start_fft_button.setText("start FFT")
-                 output_box.append("Stopping FFT process...")
+                save_streams_count -= 1
+                if save_streams_count <= 0:
+                    logging_active = False
+                    start_logging_button.setEnabled(True)
+                    output_box.append("Logging completed.")
+                    UDPSendData("-f 0")
+                    start_fft_button.setText("start FFT")
+                    output_box.append("Stopping FFT process...")
+            
+            if RealTimePredict:
+                #TODO
+                output_box.append("TODO...")
+
         else:
             output_box.append("Received UDP data (unparsed): " + str(data))
-
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+        print(f"process_udp_data execution time: {elapsed_time:.6f} seconds")
     # ------------- Change FFT Window -------------
     def fft_window_width(index):
         # Check if the UDP client is active (for example, if udp_socket is not None)
@@ -368,6 +387,7 @@ def connect_to_red_pitaya(layout, output_box):
             cmd = "-w " + str(index)
             UDPSendData(cmd)
             output_box.append(f"FFT window width changed; sent command: {cmd}")
+
     # ------------- Plot FFT Data -------------
     def Plot_fft():
         fig = plt.figure(figsize=(8, 4))
@@ -375,7 +395,7 @@ def connect_to_red_pitaya(layout, output_box):
         canvas = FigureCanvas(fig)
         canvas.ax = ax  # Store axis reference for later updates
         return canvas
-    
+
     def create_series(data_buf, header_buf):
         """
         - DataBuffer is interpreted as Int16 samples.
@@ -383,20 +403,20 @@ def connect_to_red_pitaya(layout, output_box):
         - X values are computed starting at FFT_MIN_FREQUENCY, using the frequency factor as increment.
         - Returns a matplotlib FigureCanvas with the plotted data.
         """
-        global XValues,fft_canvas
+        global XValues, fft_canvas
         FFT_MIN_FREQUENCY = 35000
         FFT_MAX_FREQUENCY = 45000
         Y_MIN = 0
         Y_MAX = 1200
         # Compute the number of samples (each sample is 2 bytes)
         DataLength = len(data_buf) // 2
-        
+
         # Convert the raw data buffer into an array of int16 values (Y values)
         YValues = np.frombuffer(data_buf, dtype=np.int16)
-        
+
         # Parse header to extract frequency factor (Header.X_Interval)
         if len(header_buf) >= 64:
-            header_vals = struct.unpack('16f', header_buf[:64])
+            header_vals = struct.unpack("16f", header_buf[:64])
             # Assume header_vals[4] holds the frequency factor.
             x_interval = header_vals[4]
         else:
@@ -404,8 +424,11 @@ def connect_to_red_pitaya(layout, output_box):
 
         # Create or update XValues if needed
         if XValues is None or len(XValues) != DataLength:
-            XValues = np.array([FFT_MIN_FREQUENCY + i * x_interval for i in range(DataLength)], dtype=np.uint16)
-        
+            XValues = np.array(
+                [FFT_MIN_FREQUENCY + i * x_interval for i in range(DataLength)],
+                dtype=np.uint16,
+            )
+
         if fft_canvas is None:
             fft_canvas = Plot_fft()
             data_layout.addWidget(fft_canvas)
@@ -413,36 +436,42 @@ def connect_to_red_pitaya(layout, output_box):
             data_display.deleteLater()
         else:
             fft_canvas.ax.clear()
-        
-        fft_canvas.ax.plot(XValues, YValues, linestyle='-', marker='o')
+
+        fft_canvas.ax.plot(XValues, YValues, linestyle="-", marker="o")
         fft_canvas.ax.set_xlabel("Frequency (Hz)")
         fft_canvas.ax.set_ylabel("Amplitude")
         fft_canvas.ax.grid(True)
         fft_canvas.ax.set_xlim(FFT_MIN_FREQUENCY, FFT_MAX_FREQUENCY)
         fft_canvas.ax.set_ylim(Y_MIN, Y_MAX)
-        fft_canvas.draw()    
-
+        fft_canvas.draw()
 
     # ------------- UDP PING HELPER FUNCTION -------------
     def ping_sensor_icmp(ip, timeout=0.05):
         """Send an ICMP ping with a 50ms timeout (0.05 sec) and return True if the sensor responds."""
         response = ping(ip, timeout=timeout)
         return response is not None
+
     # ------------------------- DStart Sensor -------------------------
     def check_sensor_connection():
         global sensor_active
         ip = sensor_ip_input_1.text().strip()
         output_box.append("Checking sensor connection...")
         if ping_sensor_icmp(ip):
-            sensor1_indicator.setStyleSheet("background-color: green; border: 1px solid black;")
+            sensor1_indicator.setStyleSheet(
+                "background-color: green; border: 1px solid black;"
+            )
             output_box.append("Sensor Active..!!")
             sensor_active = True
         else:
-            sensor1_indicator.setStyleSheet("background-color: red; border: 1px solid black;")
+            sensor1_indicator.setStyleSheet(
+                "background-color: red; border: 1px solid black;"
+            )
             output_box.append("Cannot Find Any Sensor..!!")
             sensor_active = False
 
-    def ssh_send_data(ip, command, username="root", password="root", port=22, remote_dir="/root/iic"):
+    def ssh_send_data(
+        ip, command, username="root", password="root", port=22, remote_dir="/root/iic"
+    ):
         """
         Connects to the given IP address via SSH and runs a command in the specified remote directory.
         Returns a tuple (output, errors).
@@ -460,10 +489,10 @@ def connect_to_red_pitaya(layout, output_box):
             return output, errors
         except Exception as e:
             return None, str(e)
-    
+
     def start_sensor():
         global sensor_active
-        
+
         if sensor_active:
             ip = sensor_ip_input_1.text().strip()
             out, err = ssh_send_data(ip, "pkill iic")
@@ -481,9 +510,9 @@ def connect_to_red_pitaya(layout, output_box):
                 output_box.append("Sensor started successfully.")
         else:
             output_box.append("Sensor Not Active")
-            
+
     def start_udp_thread(start):
-        global udp_thread_running,udp_thread
+        global udp_thread_running, udp_thread
         udp_thread_running = start
         if start:
             output_box.append("UDP client started.")
@@ -493,37 +522,36 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("UDP client stopped.")
 
     def start_client():
-        global udp_thread, udp_socket, client_active,sensor_active
-        
+        global udp_thread, udp_socket, client_active, sensor_active
+
         if sensor_active:
             # Query the button's state explicitly:
             if start_client_button.isChecked():
-               client_active = True
-               start_client_button.setText("stop client")
-               output_box.append("Starting UDP client...")
-               # Get the local port from the widget
-               local_port = local_ip_port_input.value()
-               udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-               udp_socket.bind(('0.0.0.0', local_port))
-               # Create and start the UDP thread
-               udp_thread = UDPClientThread(udp_socket)
-               udp_thread.data_received.connect(process_udp_data)
-               start_udp_thread(True)
+                client_active = True
+                start_client_button.setText("stop client")
+                output_box.append("Starting UDP client...")
+                # Get the local port from the widget
+                local_port = local_ip_port_input.value()
+                udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                udp_socket.bind(("0.0.0.0", local_port))
+                # Create and start the UDP thread
+                udp_thread = UDPClientThread(udp_socket)
+                udp_thread.data_received.connect(process_udp_data)
+                start_udp_thread(True)
             else:
-               start_client_button.setText("start client")
-               output_box.append("Stopping UDP client...")
-               client_active = False
-               if udp_socket is not None:
-                  udp_socket.close()
-                  udp_socket = None
-               start_udp_thread(False)
+                start_client_button.setText("start client")
+                output_box.append("Stopping UDP client...")
+                client_active = False
+                if udp_socket is not None:
+                    udp_socket.close()
+                    udp_socket = None
+                start_udp_thread(False)
         else:
             output_box.append("Sensor Not Active")
-    
 
     def start_fft(state):
-        global fft_running,client_active,sensor_active
-        
+        global fft_running, client_active, sensor_active
+
         if sensor_active:
             fft_running = state
             if client_active:
@@ -541,7 +569,7 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("Sensor Not Active")
 
     def start_logging():
-        global sensor_active,logging_active, save_streams_count,SAVE_FILE
+        global sensor_active, logging_active, save_streams_count, SAVE_FILE
         if sensor_active:
             if not logging_active:
                 logging_active = True
@@ -559,26 +587,28 @@ def connect_to_red_pitaya(layout, output_box):
                 start_logging_button.setEnabled(False)
                 # Use the value from measurements_input as the counter
                 save_streams_count = measurements_input.value()
-                output_box.append(f"Logging started. Will log {save_streams_count} data sets.")
+                output_box.append(
+                    f"Logging started. Will log {save_streams_count} data sets."
+                )
             else:
                 output_box.append("Logging is already in progress.")
         else:
             output_box.append("Sensor Not Active")
-        
 
     def select_model():
         global MODEL_FILE
-        MODEL_FILE, _ = QFileDialog.getOpenFileName(None, "Select Model File", os.getcwd(), "H5 Files (*.h5)")
+        MODEL_FILE, _ = QFileDialog.getOpenFileName(
+            None, "Select Model File", os.getcwd(), "H5 Files (*.h5)"
+        )
         if MODEL_FILE:
             output_box.append(f"Model selected: {MODEL_FILE}")
         else:
             output_box.append("No model file selected.")
 
     def start_predict(state):
-        global MODEL_FILE,client_active,ML_running,sensor_active
-        
+        global MODEL_FILE, client_active, ML_running, sensor_active, RealTimePredict
+
         if sensor_active:
-            
             ML_running = state
             output_box.append(f"Model selected: {MODEL_FILE}")
 
@@ -587,21 +617,25 @@ def connect_to_red_pitaya(layout, output_box):
                     start_predict_button.setText("Stop Predict")
                     output_box.append("Starting Predict process...")
                     UDPSendData("-f 1")
+                    RealTimePredict = True
                 else:
                     start_predict_button.setText("Start Predict")
                     output_box.append("Stopping Predict process...")
                     UDPSendData("-f 0")
+                    RealTimePredict = False
             else:
                 output_box.append("UDP Client not Started..!!")
         else:
             output_box.append("Sensor Not Active")
 
-
     check_connection_button.clicked.connect(check_sensor_connection)
     start_sensor_button.clicked.connect(start_sensor)
-    start_client_button.toggled.connect(start_client)
+    start_client_button.setCheckable(True)
+    start_client_button.toggled.connect(lambda state: start_client())
+    start_fft_button.setCheckable(True)
     start_fft_button.toggled.connect(lambda state: start_fft(state))
     fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
     select_model_button.clicked.connect(select_model)
+    start_predict_button.setCheckable(True)
     start_predict_button.toggled.connect(lambda state: start_predict(state))
