@@ -32,6 +32,7 @@ udp_socket = None
 client_active = False
 udp_thread_running = False
 fft_running = False
+sensor_active = False
 
 # Global variables for plotting
 fft_canvas = None
@@ -193,7 +194,6 @@ def connect_to_red_pitaya(layout, output_box):
     start_logging_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     start_fft_button = QPushButton("start FFT")
-    start_fft_button.setCheckable(True)
     start_fft_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_fft_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -223,7 +223,6 @@ def connect_to_red_pitaya(layout, output_box):
     select_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     start_predict_button = QPushButton("Start Predict")
-    start_predict_button.setCheckable(True)
     start_predict_button.setStyleSheet("font-size: 18px; padding: 5px;")
     start_predict_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -431,14 +430,17 @@ def connect_to_red_pitaya(layout, output_box):
         return response is not None
     # ------------------------- DStart Sensor -------------------------
     def check_sensor_connection():
+        global sensor_active
         ip = sensor_ip_input_1.text().strip()
         output_box.append("Checking sensor connection...")
         if ping_sensor_icmp(ip):
             sensor1_indicator.setStyleSheet("background-color: green; border: 1px solid black;")
             output_box.append("Sensor Active..!!")
+            sensor_active = True
         else:
             sensor1_indicator.setStyleSheet("background-color: red; border: 1px solid black;")
             output_box.append("Cannot Find Any Sensor..!!")
+            sensor_active = False
 
     def ssh_send_data(ip, command, username="root", password="root", port=22, remote_dir="/root/iic"):
         """
@@ -460,21 +462,26 @@ def connect_to_red_pitaya(layout, output_box):
             return None, str(e)
     
     def start_sensor():
-        ip = sensor_ip_input_1.text().strip()
-        out, err = ssh_send_data(ip, "pkill iic")
-        if err:
-            output_box.append(f"Error stopping sensor: {err}")
+        global sensor_active
+        
+        if sensor_active:
+            ip = sensor_ip_input_1.text().strip()
+            out, err = ssh_send_data(ip, "pkill iic")
+            if err:
+                output_box.append(f"Error stopping sensor: {err}")
+            else:
+                output_box.append("Initializing...")
+
+            output_box.append("Starting sensor...")
+
+            out, err = ssh_send_data(ip, "./iic")
+            if err:
+                output_box.append(f"Error starting sensor: {err}")
+            else:
+                output_box.append("Sensor started successfully.")
         else:
-            output_box.append("Initializing...")
-
-        output_box.append("Starting sensor...")
-
-        out, err = ssh_send_data(ip, "./iic")
-        if err:
-            output_box.append(f"Error starting sensor: {err}")
-        else:
-            output_box.append("Sensor started successfully.")
-
+            output_box.append("Sensor Not Active")
+            
     def start_udp_thread(start):
         global udp_thread_running,udp_thread
         udp_thread_running = start
@@ -486,68 +493,78 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("UDP client stopped.")
 
     def start_client():
-        global udp_thread, udp_socket, client_active
-        # Query the button's state explicitly:
-        if start_client_button.isChecked():
-           client_active = True
-           start_client_button.setText("stop client")
-           output_box.append("Starting UDP client...")
-           # Get the local port from the widget
-           local_port = local_ip_port_input.value()
-           udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-           udp_socket.bind(('0.0.0.0', local_port))
-           # Create and start the UDP thread
-           udp_thread = UDPClientThread(udp_socket)
-           udp_thread.data_received.connect(process_udp_data)
-           start_udp_thread(True)
+        global udp_thread, udp_socket, client_active,sensor_active
+        
+        if sensor_active:
+            # Query the button's state explicitly:
+            if start_client_button.isChecked():
+               client_active = True
+               start_client_button.setText("stop client")
+               output_box.append("Starting UDP client...")
+               # Get the local port from the widget
+               local_port = local_ip_port_input.value()
+               udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+               udp_socket.bind(('0.0.0.0', local_port))
+               # Create and start the UDP thread
+               udp_thread = UDPClientThread(udp_socket)
+               udp_thread.data_received.connect(process_udp_data)
+               start_udp_thread(True)
+            else:
+               start_client_button.setText("start client")
+               output_box.append("Stopping UDP client...")
+               client_active = False
+               if udp_socket is not None:
+                  udp_socket.close()
+                  udp_socket = None
+               start_udp_thread(False)
         else:
-           start_client_button.setText("start client")
-           output_box.append("Stopping UDP client...")
-           client_active = False
-           if udp_socket is not None:
-              udp_socket.close()
-              udp_socket = None
-              
-           start_udp_thread(False)
+            output_box.append("Sensor Not Active")
     
 
     def start_fft(state):
-        global fft_running,client_active
-        fft_running = state
-        if client_active:
-            if fft_running:
-                start_fft_button.setText("stop FFT")
-                output_box.append("Starting FFT process...")
-                UDPSendData("-f 1")
+        global fft_running,client_active,sensor_active
+        
+        if sensor_active:
+            fft_running = state
+            if client_active:
+                if fft_running:
+                    start_fft_button.setText("stop FFT")
+                    output_box.append("Starting FFT process...")
+                    UDPSendData("-f 1")
+                else:
+                    start_fft_button.setText("start FFT")
+                    output_box.append("Stopping FFT process...")
+                    UDPSendData("-f 0")
             else:
-                start_fft_button.setText("start FFT")
-                output_box.append("Stopping FFT process...")
-                UDPSendData("-f 0")
+                output_box.append("UDP Client not Started..!!")
         else:
-            output_box.append("UDP Client not Started..!!")
-
+            output_box.append("Sensor Not Active")
 
     def start_logging():
-        global logging_active, save_streams_count,SAVE_FILE
-        if not logging_active:
-           logging_active = True
+        global sensor_active,logging_active, save_streams_count,SAVE_FILE
+        if sensor_active:
+            if not logging_active:
+                logging_active = True
 
-           cwd = os.getcwd()
-           logs_folder = os.path.join(cwd, "SensorUIApp - Logs")
-           if not os.path.exists(logs_folder):
-               os.makedirs(logs_folder)
-           now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-           filename = f"FFT_readings_{now_str}.txt"
+                cwd = os.getcwd()
+                logs_folder = os.path.join(cwd, "SensorUIApp - Logs")
+                if not os.path.exists(logs_folder):
+                    os.makedirs(logs_folder)
+                now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"FFT_readings_{now_str}.txt"
 
-           SAVE_FILE = os.path.join(logs_folder, filename)
+                SAVE_FILE = os.path.join(logs_folder, filename)
 
-           # Disable the button so the user cannot press it again until logging is done.
-           start_logging_button.setEnabled(False)
-           # Use the value from measurements_input as the counter
-           save_streams_count = measurements_input.value()
-           output_box.append(f"Logging started. Will log {save_streams_count} data sets.")
+                # Disable the button so the user cannot press it again until logging is done.
+                start_logging_button.setEnabled(False)
+                # Use the value from measurements_input as the counter
+                save_streams_count = measurements_input.value()
+                output_box.append(f"Logging started. Will log {save_streams_count} data sets.")
+            else:
+                output_box.append("Logging is already in progress.")
         else:
-            output_box.append("Logging is already in progress.")
+            output_box.append("Sensor Not Active")
+        
 
     def select_model():
         global MODEL_FILE
@@ -558,31 +575,33 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("No model file selected.")
 
     def start_predict(state):
-        global MODEL_FILE,client_active,ML_running
-        ML_running = state
-        output_box.append(f"Model selected: {MODEL_FILE}")
+        global MODEL_FILE,client_active,ML_running,sensor_active
+        
+        if sensor_active:
+            
+            ML_running = state
+            output_box.append(f"Model selected: {MODEL_FILE}")
 
-        if client_active:
-            if ML_running:
-                start_predict_button.setText("Stop Predict")
-                output_box.append("Starting Predict process...")
-                UDPSendData("-f 1")
+            if client_active:
+                if ML_running:
+                    start_predict_button.setText("Stop Predict")
+                    output_box.append("Starting Predict process...")
+                    UDPSendData("-f 1")
+                else:
+                    start_predict_button.setText("Start Predict")
+                    output_box.append("Stopping Predict process...")
+                    UDPSendData("-f 0")
             else:
-                start_predict_button.setText("Start Predict")
-                output_box.append("Stopping Predict process...")
-                UDPSendData("-f 0")
+                output_box.append("UDP Client not Started..!!")
         else:
-            output_box.append("UDP Client not Started..!!")
+            output_box.append("Sensor Not Active")
 
 
     check_connection_button.clicked.connect(check_sensor_connection)
     start_sensor_button.clicked.connect(start_sensor)
-    start_client_button.setCheckable(True)
-    start_client_button.toggled.connect(lambda state: start_client())
-    start_fft_button.setCheckable(True)
+    start_client_button.toggled.connect(start_client)
     start_fft_button.toggled.connect(lambda state: start_fft(state))
     fftwindow_input.currentIndexChanged.connect(fft_window_width)
     start_logging_button.clicked.connect(start_logging)
     select_model_button.clicked.connect(select_model)
-    start_predict_button.setCheckable(True)
     start_predict_button.toggled.connect(lambda state: start_predict(state))
