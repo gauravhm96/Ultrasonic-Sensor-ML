@@ -263,9 +263,15 @@ def connect_to_red_pitaya(layout, output_box):
     sensor1_indicator = QFrame()
     sensor1_indicator.setFixedSize(20, 20)
     sensor1_indicator.setStyleSheet("background-color: red; border: 1px solid black;")
+    
+    status_display = QLabel()
+    status_display.setStyleSheet("font-size: 18px; border: 1px solid gray; padding: 5px;")
+    status_display.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    status_display.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     sensor1_h_layout.addWidget(sensor1_label)
     sensor1_h_layout.addWidget(sensor1_indicator)
+    sensor1_h_layout.addWidget(status_display)
     sensor_status_layout.addLayout(sensor1_h_layout)
     sensor_status_group.setLayout(sensor_status_layout)
     left_v_layout.addWidget(sensor_status_group)
@@ -330,7 +336,7 @@ def connect_to_red_pitaya(layout, output_box):
 
             if len(header_buf) >= 64:
                 header_vals = struct.unpack("16f", header_buf[:64])
-                header_line = "\t".join(str(int(val)) for val in header_vals)
+                header_line = "\t".join(f"{val:.2f}" for val in header_vals)
             else:
                 header_line = "Header Error\n"
             SAVE_HEADER = header_line
@@ -351,6 +357,8 @@ def connect_to_red_pitaya(layout, output_box):
                 output_box.append(f"Error logging data: {e}")
 
         save_streams_count -= 1
+        logged = start_logging_button.initial_count - save_streams_count
+        status_display.setText(f"Measurements: {logged} / {start_logging_button.initial_count}")
         if save_streams_count <= 0:
             logging_active = False
             start_logging_button.setEnabled(True)
@@ -422,6 +430,11 @@ def connect_to_red_pitaya(layout, output_box):
 
         if header_buf is not None:
             create_series(data_buf, header_buf)
+            
+            if len(header_buf) >= 64:
+                header_vals = struct.unpack("16f", header_buf[:64])
+                distance = header_vals[10]
+                status_display.setText(f"Dist: {distance:.2f} m")
 
             if logging_active:
                 log_fft_data(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor)
@@ -546,8 +559,8 @@ def connect_to_red_pitaya(layout, output_box):
 
     def start_sensor():
         global sensor_active
-
         if sensor_active:
+            start_sensor_button.setText("stop Sensor")
             ip = sensor_ip_input_1.text().strip()
             out, err = ssh_send_data(ip, "pkill iic")
             if err:
@@ -563,6 +576,7 @@ def connect_to_red_pitaya(layout, output_box):
             else:
                 output_box.append("Sensor started successfully.")
         else:
+            start_sensor_button.setText("start Sensor")
             output_box.append("Sensor Not Active")
 
     def start_udp_thread(start):
@@ -641,6 +655,7 @@ def connect_to_red_pitaya(layout, output_box):
                 start_logging_button.setEnabled(False)
                 # Use the value from measurements_input as the counter
                 save_streams_count = measurements_input.value()
+                start_logging_button.initial_count = measurements_input.value()
                 output_box.append(
                     f"Logging started. Will log {save_streams_count} data sets."
                 )
