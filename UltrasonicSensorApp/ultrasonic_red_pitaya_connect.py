@@ -53,7 +53,7 @@ ML_running = False
 RealTimePredict = False
 predict_buffer = [] 
 MAX_PREDICT_MEASUREMENTS = 200
-
+display_distance = None
 
 class UDPClientThread(QThread):
     # Signal to emit incoming UDP data (as bytes)
@@ -368,7 +368,7 @@ def connect_to_red_pitaya(layout, output_box):
             output_box.append("Stopping FFT process...")
     
     def real_time_predict(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor):
-        global predict_buffer,MODEL_FILE,SAVE_HEADER
+        global predict_buffer,MODEL_FILE,SAVE_HEADER,display_distance
         Predict = Predict_FFT()
 
         if not predict_buffer:
@@ -379,7 +379,8 @@ def connect_to_red_pitaya(layout, output_box):
 
             if len(header_buf) >= 64:
                 header_vals = struct.unpack("16f", header_buf[:64])
-                header_line = "\t".join(str(int(val)) for val in header_vals)
+                header_line = "\t".join(f"{val:.2f}" for val in header_vals)
+                display_distance = header_vals[10]
             else:
                 header_line = "Header Error"
             SAVE_HEADER = header_line
@@ -406,9 +407,12 @@ def connect_to_red_pitaya(layout, output_box):
 
                 for label in predicted_labels:
                     if label == 0:
-                        print("Wear Seat Belt...!!")
+                        message = "Wear Seat Belt..!!"
+                        print(message)
                     else:
-                        print("No Presence Detected..")
+                        message = "No Presence Detected.."
+                        print(message)
+                    status_display.setText(f"<span style='color:red;'>{message}</span> <span style='color:black;'>Dist: {display_distance:.2f} m</span>")
             os.remove(temp_file_path)
 
             if MODEL_FILE:
@@ -422,7 +426,7 @@ def connect_to_red_pitaya(layout, output_box):
 
     def process_udp_data(data):
         start_time = time.perf_counter()
-        global logging_active, save_streams_count, SAVE_FILE, SAVE_HEADER, RealTimePredict
+        global logging_active, save_streams_count, SAVE_FILE, SAVE_HEADER, RealTimePredict,display_distance
         header_buf, data_buf = process_udp_message(data)
         FFT_MinFrequencyIndex = 293
         FFT_MaxFrequencyIndex = 377
@@ -431,10 +435,11 @@ def connect_to_red_pitaya(layout, output_box):
         if header_buf is not None:
             create_series(data_buf, header_buf)
             
-            if len(header_buf) >= 64:
-                header_vals = struct.unpack("16f", header_buf[:64])
-                distance = header_vals[10]
-                status_display.setText(f"Dist: {distance:.2f} m")
+            if not RealTimePredict:
+                if len(header_buf) >= 64:
+                    header_vals = struct.unpack("16f", header_buf[:64])
+                    display_distance = header_vals[10]
+                    status_display.setText(f"Dist: {display_distance:.2f} m")
 
             if logging_active:
                 log_fft_data(header_buf, data_buf, FFT_MinFrequencyIndex, FFT_MaxFrequencyIndex, FFT_FrequencyFactor)
