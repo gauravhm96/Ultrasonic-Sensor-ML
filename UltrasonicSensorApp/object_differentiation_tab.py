@@ -31,6 +31,10 @@ from object_differentiation_signal_process import (
 from object_differentiation_predict import Predict_FFT
 from object_differentiation_train import FFTModel
 
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+
 # ------------------- Global Variables -------------------
 signal_data = None
 file_path = None
@@ -40,6 +44,8 @@ history = None
 predictmodelpath = None
 predictfilepath = None
 Loadcnnmodel = None
+X_test  = None
+y_test  = None
 
 def object_differentiation_features(layout, output_box):
 
@@ -536,7 +542,7 @@ def object_differentiation_features(layout, output_box):
     layout.addWidget(progress_bar)
 
     def train_my_model():
-        global folder_path, model, history
+        global folder_path, model, history,X_test, y_test
 
         if folder_path is None:
             output_box.append("No Folder or Files to Train...!!!")
@@ -705,6 +711,20 @@ def object_differentiation_features(layout, output_box):
     Train_button_layout.itemAt(2).widget().clicked.connect(train_my_model)
     Train_button_layout.itemAt(3).widget().clicked.connect(plot_model)
 
+
+    Save_button_layout = QHBoxLayout()  # Use Horizontal Layout
+    Save_button_layout.setSpacing(10)  # Add some spacing between buttons
+    Save_button_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+    Save_button_layout.setAlignment(Qt.AlignLeft)
+
+    # Create the Confusion Matrix Button
+    confusion_matrix_button = QPushButton("Confusion Matrix")
+    confusion_matrix_button.setStyleSheet(
+        "font-size: 18px;font-weight: normal; padding: 5px;"
+    )
+    confusion_matrix_button.setFixedWidth(200)
+    confusion_matrix_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
     save_model_button = QPushButton("Save Model")
     save_model_button.setStyleSheet(
         "font-size: 18px;font-weight: normal; padding: 5px;"
@@ -712,9 +732,7 @@ def object_differentiation_features(layout, output_box):
     save_model_button.setFixedWidth(200)
     save_model_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-    Save_button_layout = (
-        QVBoxLayout()
-    )  # This layout will be placed below Train_button_layout
+    Save_button_layout.addWidget(confusion_matrix_button)
     Save_button_layout.addWidget(save_model_button)
 
     layout.addLayout(Save_button_layout)
@@ -733,7 +751,61 @@ def object_differentiation_features(layout, output_box):
             model.save(file_path)
             output_box.append(f"Model saved successfully at: {file_path}")
 
+    def plot_confusion_matrix():
+        global model, X_test, y_test  # Ensure model and test data are accessible
+
+        if model is None or X_test is None or y_test is None:
+            output_box.append("Error: No trained model or test data available!")
+            return
+
+        # Get predictions on test data
+        y_pred = model.predict(X_test)
+        y_pred = (y_pred > 0.5).astype(int)  # Convert probabilities to binary class (0 or 1)
+
+        # Compute confusion matrix
+        cm = confusion_matrix(y_test, y_pred)
+        report = classification_report(y_test, y_pred, target_names=["Occupied", "Not_Occupied"])
+        output_box.append(report)  # Display in GUI
+        print(report)
+        # Create a figure for the confusion matrix
+        fig, ax = plt.subplots(figsize=(6, 5))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Occupied", "Not_Occupied"], yticklabels=["Occupied", "Not_Occupied"], ax=ax)
+        
+        ax.set_xlabel("Predicted Labels")
+        ax.set_ylabel("True Labels")
+        ax.set_title("Confusion Matrix")
+
+        # Create the canvas to display the plot inside the GUI
+        canvas = FigureCanvas(fig)
+        toolbar = NavigationToolbar2QT(canvas)
+
+        # Create a dialog window to show the Confusion Matrix
+        plot_dialog = QDialog()
+        plot_dialog.setWindowTitle("Confusion Matrix")
+
+        # Set window flags to allow maximize, minimize, and close buttons
+        plot_dialog.setWindowFlags(
+            Qt.Window
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMinimizeButtonHint
+        )
+
+        # Set the dialog to be resizable and maximizable
+        plot_dialog.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        plot_dialog.setMinimumSize(800, 600)
+
+        # Layout for the dialog
+        dialog_layout = QVBoxLayout(plot_dialog)
+        dialog_layout.addWidget(toolbar)  # Add the toolbar for plot navigation
+        dialog_layout.addWidget(canvas)  # Add the canvas to show the Confusion Matrix
+
+        # Show the plot dialog
+        plot_dialog.exec_()
+        output_box.append("Confusion Matrix Generated!")
+        
     save_model_button.clicked.connect(save_trained_model)
+    confusion_matrix_button.clicked.connect(plot_confusion_matrix)
 
     spacer = QSpacerItem(QSizePolicy.Minimum, QSizePolicy.Expanding)
     layout.addItem(spacer)  # Adds vertical spac
